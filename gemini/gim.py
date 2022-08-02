@@ -41,30 +41,26 @@ class GeminiInheritanceModel(object):
     def query(self):
         if self.args.columns is not None:
             # the user only wants to report a subset of the columns
-            query = "SELECT " + str(self.args.columns) + " FROM variants "
+            query = f"SELECT {str(self.args.columns)} FROM variants "
         else:
             # report the kitchen sink
             query = "SELECT chrom, start, end, * %s " \
-                + "FROM variants" % ", ".join(self.gt_cols)
+                    + "FROM variants" % ", ".join(self.gt_cols)
 
         query = sql_utils.ensure_columns(query, ['variant_id', 'gene'])
         # add any non-genotype column limits to the where clause
         if self.args.filter:
-            query += " WHERE (" + self.args.filter + ")"
+            query += f" WHERE ({self.args.filter})"
 
         if hasattr(self.args, 'X'):
             if self.args.X == []:
                 self.args.X = ['chrX', 'X']
             part = "chrom IN (%s)" % ", ".join("'%s'" % x for x in self.args.X)
-            if " WHERE " in query:
-                query += " AND " + part
-            else:
-                query += " WHERE " + part
-
+            query += f" AND {part}" if " WHERE " in query else f" WHERE {part}"
         # auto_rec and auto_dom candidates should be limited to
         # variants affecting genes.
         if self.model in ("auto_rec", "auto_dom", "comp_het") or \
-           (self.model == "de_novo" and self.args.min_kindreds is not None):
+               (self.model == "de_novo" and self.args.min_kindreds is not None):
 
             # we require the "gene" column for the auto_* tools
             if " WHERE " in query:
@@ -74,9 +70,9 @@ class GeminiInheritanceModel(object):
 
         # only need to order by gene for comp_het and when min_kindreds is used.
         if self.model == "comp_het" or not (
-                self.args.min_kindreds in (None, 1)
-                and (self.args.families is None
-                     or not "," in self.args.families)):
+            self.args.min_kindreds in (None, 1)
+            and (self.args.families is None or "," not in self.args.families)
+        ):
             query += " ORDER by chrom, gene"
 
         return query
@@ -92,8 +88,7 @@ class GeminiInheritanceModel(object):
                 if isinstance(gt_filter, dict):
                     for k, flt in gt_filter.items():
                         variant_ids.update(filter(self.args.db, flt, {}))
-                else:
-                    if gt_filter == 'False': continue
+                elif gt_filter != 'False':
                     # TODO: maybe we should just or these together and call filter once.
                     variant_ids.update(filter(self.args.db, gt_filter, {}))
 
@@ -117,19 +112,16 @@ class GeminiInheritanceModel(object):
             # no variants met the criteria
             raise StopIteration
 
-        for grp_key, grp in it.groupby(self.gq, group_key):
-            yield grp_key, grp
+        yield from it.groupby(self.gq, group_key)
 
     def all_candidates(self):
 
         _, candidates = self.gen_candidates(group_key=None)
-        for candidate in candidates:
-            yield candidate
+        yield from candidates
 
     def gene_candidates(self):
 
-        for gene, candidates in self.gen_candidates(group_key="gene"):
-            yield gene, candidates
+        yield from self.gen_candidates(group_key="gene")
 
     def set_family_info(self):
         """
@@ -145,7 +137,7 @@ class GeminiInheritanceModel(object):
                   'min_gq': args.min_gq}
         if self.model == "mendel_violations":
             kwargs = {'only_affected': self.args.only_affected}
-        if self.model != "comp_het" and self.model != "mendel_violations":
+        if self.model not in ["comp_het", "mendel_violations"]:
             if hasattr(self.args, 'lenient'):
                 kwargs['strict'] = not self.args.lenient
         elif self.model == "comp_het":
@@ -156,7 +148,7 @@ class GeminiInheritanceModel(object):
         if self.model in ('x_rec', 'x_dom', 'x_denovo'):
             kwargs.pop('only_affected')
 
-        requested_fams = None if not args.families else set(args.families.split(","))
+        requested_fams = set(args.families.split(",")) if args.families else None
 
         for family in families:
             if requested_fams is None or family.family_id in requested_fams:
@@ -177,10 +169,16 @@ class GeminiInheritanceModel(object):
             req_cols.append('gt_depths')
         if getattr(args, 'gt_phred_ll', False) or self.model == "mendel_violations":
 
-            for col in ['gt_phred_ll_homref', 'gt_phred_ll_het',
-                        'gt_phred_ll_homalt']:
-                if col in self.gt_cols:
-                    req_cols.append(col)
+            req_cols.extend(
+                col
+                for col in [
+                    'gt_phred_ll_homref',
+                    'gt_phred_ll_het',
+                    'gt_phred_ll_homalt',
+                ]
+                if col in self.gt_cols
+            )
+
         if args.min_gq != 0 and 'gt_quals' in self.gt_cols:
             req_cols.append('gt_quals')
 
@@ -208,7 +206,7 @@ class GeminiInheritanceModel(object):
                      ('empty', 'False') else m for m in self.family_masks]
             masks = [compile(m, m, 'eval') if m != 'False' else 'False' for m in masks]
 
-        requested_fams = None if not args.families else set(args.families.split(","))
+        requested_fams = set(args.families.split(",")) if args.families else None
 
         for gene, li in self.candidates():
 
@@ -226,9 +224,9 @@ class GeminiInheritanceModel(object):
                     except ValueError:
                         pass
 
-                cols = dict((col, row[col]) for col in req_cols)
+                cols = {col: row[col] for col in req_cols}
                 fams_to_test = enumerate(self.families) if cur_fam is None \
-                                else [(i, f) for i, f in enumerate(self.families) if f.family_id == cur_fam]
+                                    else [(i, f) for i, f in enumerate(self.families) if f.family_id == cur_fam]
                 # limit to families requested by the user.
                 if requested_fams is not None:
                     fams_to_test = ((i, f) for i, f in fams_to_test if f.family_id in requested_fams)
@@ -240,7 +238,7 @@ class GeminiInheritanceModel(object):
                         for inh_model, mask in mask_dict.items():
                             if masks[i] != 'False' and eval(mask, cols):
                                 if f in fams:
-                                    models[-1] += ";" + inh_model
+                                    models[-1] += f";{inh_model}"
                                 else:
                                     fams.append(f)
                                     models.append(inh_model)
@@ -255,7 +253,7 @@ class GeminiInheritanceModel(object):
                     # get a *shallow* copy of the ordered dict.
                     # populate with the fields required by the tools.
                     pdict["family_id"] = fam.family_id
-                    pdict["family_members"] = ",".join("%s" % m for m in fam.subjects)
+                    pdict["family_members"] = ",".join(f"{m}" for m in fam.subjects)
                     if PY3:
                         pdict["family_genotypes"] = to_str(",".join(eval(str(to_str(s)), cols) for s in fam.gts))
                     else:
@@ -294,7 +292,10 @@ class GeminiInheritanceModel(object):
                     # remove singletons.
                     to_yield = [item for item in to_yield if counts[(item['comp_het_id'], item['family_id'])] > 1]
                     # re-check min_kindreds
-                    if len(set(item['family_id'] for item in to_yield)) < self.args.min_kindreds:
+                    if (
+                        len({item['family_id'] for item in to_yield})
+                        < self.args.min_kindreds
+                    ):
                         continue
 
                 for item in to_yield:
@@ -327,8 +328,7 @@ class XRec(GeminiInheritanceModel):
     model = "x_rec"
 
     def candidates(self):
-        for g, li in self.gen_candidates('gene'):
-            yield g, li
+        yield from self.gen_candidates('gene')
 
 class XDenovo(XRec):
     model = "x_denovo"
@@ -341,8 +341,7 @@ class AutoDom(GeminiInheritanceModel):
     model = "auto_dom"
 
     def candidates(self):
-        for g, li in self.gen_candidates('gene'):
-            yield g, li
+        yield from self.gen_candidates('gene')
 
 
 class AutoRec(AutoDom):
@@ -354,16 +353,14 @@ class DeNovo(GeminiInheritanceModel):
 
     def candidates(self):
         kins = self.args.min_kindreds
-        for g, li in self.gen_candidates('gene' if kins is not None else None):
-            yield g, li
+        yield from self.gen_candidates('gene' if kins is not None else None)
 
 
 class MendelViolations(GeminiInheritanceModel):
     model = "mendel_violations"
 
     def candidates(self):
-        for g, li in self.gen_candidates(None):
-            yield g, li
+        yield from self.gen_candidates(None)
 
 
 class CompoundHet(GeminiInheritanceModel):
@@ -401,7 +398,7 @@ class CompoundHet(GeminiInheritanceModel):
             return ",".join(custom_columns)
         self.added = []
         for col in ("gene", "chrom", "start", "ref", "alt", "variant_id"):
-            if not col in custom_columns:
+            if col not in custom_columns:
                 custom_columns.append(col)
                 if col != "variant_id":
                     self.added.append(col)

@@ -21,7 +21,7 @@ def compile_decorator(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         query_string = f(*args, **kwargs)
-        if query_string == "False" or query_string == {"any": "False"}:
+        if query_string in ["False", {"any": "False"}]:
             return None
         if not isinstance(query_string, dict):
             return compile(query_string, "<string>", "eval")
@@ -29,6 +29,7 @@ def compile_decorator(f):
         for k, stmt in query_dict.iteritems():
             query_dict[k] = compile(stmt, "<string>", "eval")
         return query_dict
+
     return wrapper
 
 def get_phred_query(sample_id, gt_ll, genotype, prefix=" and ", invert=False):
@@ -118,11 +119,11 @@ def get_families(db, selected_families=None):
             if family not in families_dict:
                 raise ValueError("Family \"%s\" is not a valid family_id\n" % family)
 
-    families = []
-    for fam in families_dict:
-        if selected_families is None or fam in selected_families:
-            families.append(families_dict[fam])
-    return families
+    return [
+        families_dict[fam]
+        for fam in families_dict
+        if selected_families is None or fam in selected_families
+    ]
 
 def get_family_dict(args):
     families = defaultdict(list)
@@ -142,9 +143,12 @@ def get_subjects(args, skip_filter=False):
 
     #query = "SELECT * FROM samples"
     query = ""
-    if not skip_filter:
-        if hasattr(args, 'sample_filter') and args.sample_filter:
-            query += args.sample_filter
+    if (
+        not skip_filter
+        and hasattr(args, 'sample_filter')
+        and args.sample_filter
+    ):
+        query += args.sample_filter
 
     res = gq.metadata.tables["samples"].select().where(sql.text(query)).execute()
 
@@ -157,11 +161,11 @@ def get_subjects(args, skip_filter=False):
 def get_subjects_in_family(args, family):
     subjects = get_subjects(args)
     family_names = [f.name for f in family]
-    subject_dict = {}
-    for subject in subjects:
-        if subject in family_names:
-            subject_dict[subject] = subjects[subject]
-    return subject_dict
+    return {
+        subject: subjects[subject]
+        for subject in subjects
+        if subject in family_names
+    }
 
 if __name__ == "__main__":
     import doctest

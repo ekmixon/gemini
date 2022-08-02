@@ -31,11 +31,12 @@ def family_wise_predicate(args):
         predicates.append(select_subjects_predicate(subjects, args,
                                                     family_names))
     def predicate(row):
-        return sum([p(row) for p in predicates]) >= args.min_kindreds
+        return sum(p(row) for p in predicates) >= args.min_kindreds
+
     return predicate
 
 def select_subjects_predicate(subjects, args, subset=None):
-    subjects = set([s.name for s in subjects])
+    subjects = {s.name for s in subjects}
     predicates = []
     if "all" in args.in_subject:
         predicates.append(variant_in_all_subjects(subjects))
@@ -47,10 +48,12 @@ def select_subjects_predicate(subjects, args, subset=None):
         predicates.append(variant_in_any_subject(subjects))
     if "not" in args.in_subject:
         def predicate(row):
-            return not all([p(row) for p in predicates])
+            return not all(p(row) for p in predicates)
+
     else:
         def predicate(row):
-            return all([p(row) for p in predicates])
+            return all(p(row) for p in predicates)
+
     return predicate
 
 def variant_in_any_subject(subjects):

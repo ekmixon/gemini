@@ -17,11 +17,11 @@ def zprob(z):
 
     Usage:   lzprob(z)
     """
-    Z_MAX = 6.0    # maximum meaningful z-value
     if z == 0.0:
         x = 0.0
     else:
         y = 0.5 * math.fabs(z)
+        Z_MAX = 6.0    # maximum meaningful z-value
         if y >= (Z_MAX*0.5):
             x = 1.0
         elif (y < 1.0):
@@ -41,11 +41,7 @@ def zprob(z):
                      +0.011630447319) * y -0.009279453341) * y
                    +0.005353579108) * y -0.002141268741) * y
                  +0.000535310849) * y +0.999936657524
-    if z > 0.0:
-        prob = ((x+1.0)*0.5)
-    else:
-        prob = ((1.0-x)*0.5)
-    return prob
+    return ((x+1.0)*0.5) if z > 0.0 else ((1.0-x)*0.5)
     
     
 def lchisqprob(chisq,df):
@@ -58,51 +54,33 @@ def lchisqprob(chisq,df):
     BIG = 20.0
     def ex(x):
         BIG = 20.0
-        if x < -BIG:
-            return 0.0
-        else:
-            return math.exp(x)
+        return 0.0 if x < -BIG else math.exp(x)
 
     if chisq <=0 or df < 1:
         return 1.0
     a = 0.5 * chisq
-    if df%2 == 0:
-        even = 1
-    else:
-        even = 0
+    even = 1 if df%2 == 0 else 0
     if df > 1:
         y = ex(-a)
-    if even:
-        s = y
-    else:
-        s = 2.0 * zprob(-math.sqrt(chisq))
+    s = y if even else 2.0 * zprob(-math.sqrt(chisq))
     if (df > 2):
         chisq = 0.5 * (df - 1.0)
-        if even:
-            z = 1.0
-        else:
-            z = 0.5
+        z = 1.0 if even else 0.5
         if a > BIG:
-            if even:
-                e = 0.0
-            else:
-                e = math.log(math.sqrt(math.pi))
+            e = 0.0 if even else math.log(math.sqrt(math.pi))
             c = math.log(a)
             while (z <= chisq):
                 e = math.log(z) + e
                 s = s + ex(c*z-a-e)
-                z = z + 1.0
+                z += 1.0
             return s
         else:
-            if even:
-                e = 1.0
-            else:
-                e = 1.0 / math.sqrt(math.pi) / math.sqrt(a)
+            e = 1.0 if even else 1.0 / math.sqrt(math.pi) / math.sqrt(a)
             c = 0.0
             while (z <= chisq):
-                e = e * (a/float(z))
+                e = e * (a / z)
                 c = c + e
-                z = z + 1.0
+                z += 1.0
             return (c*y+s)
     else:
         return s

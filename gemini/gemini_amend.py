@@ -28,7 +28,7 @@ def amend_sample(args):
                 item_list = map(quote_string, ped_dict[k])
                 sample = zip(header, item_list)
                 #set_str = ",".join([str(x) + "=" + str(y).decode('utf8', 'ignore') for (x, y) in sample])
-                set_str = ",".join([str(x) + "=" + str(y) for (x, y) in sample])
+                set_str = ",".join([f"{str(x)}={str(y)}" for (x, y) in sample])
                 sql_query = "update samples set {0} where sample_id={1}"
                 c.execute(sql_query.format(set_str, v.sample_id))
 

@@ -225,6 +225,7 @@ def main():
     def amend_fn(parser, args):
         from gemini import gemini_amend
         gemini_amend.amend(parser, args)
+
     parser_amend.set_defaults(func=amend_fn)
 
     #########################################
@@ -309,6 +310,7 @@ def main():
         if args.vcf != "-":
             args.vcf = os.path.abspath(args.vcf)
         gemini_load_chunk.load(parser, args)
+
     parser_loadchunk.set_defaults(func=loadchunk_fn)
 
     #########################################
@@ -344,6 +346,7 @@ def main():
     def mergechunk_fn(parser, args):
         from gemini import gemini_merge_chunks
         gemini_merge_chunks.merge_chunks(parser, args)
+
     parser_mergechunks.set_defaults(func=mergechunk_fn)
 
     #########################################
@@ -481,6 +484,7 @@ def main():
     def dump_fn(parser, args):
         from gemini import gemini_dump
         gemini_dump.dump(parser, args)
+
     parser_dump.set_defaults(func=dump_fn)
 
     #########################################
@@ -526,6 +530,7 @@ def main():
     def region_fn(parser, args):
         from gemini import gemini_region
         gemini_region.region(parser, args)
+
     parser_region.set_defaults(func=region_fn)
 
     #########################################
@@ -588,6 +593,7 @@ def main():
     def stats_fn(parser, args):
         from gemini import gemini_stats
         gemini_stats.stats(parser, args)
+
     parser_stats.set_defaults(func=stats_fn)
 
     #########################################
@@ -636,6 +642,7 @@ def main():
     def annotate_fn(parser, args):
         from gemini import gemini_annotate
         gemini_annotate.annotate(parser, args)
+
     parser_get.set_defaults(func=annotate_fn)
 
     #########################################
@@ -669,6 +676,7 @@ def main():
     def windower_fn(parser, args):
         from gemini import gemini_windower
         gemini_windower.windower(parser, args)
+
     parser_get.set_defaults(func=windower_fn)
 
     #########################################
@@ -682,6 +690,7 @@ def main():
     def dbinfo_fn(parser, args):
         from gemini import gemini_dbinfo
         gemini_dbinfo.db_info(parser, args)
+
     parser_get.set_defaults(func=dbinfo_fn)
 
     #########################################
@@ -709,6 +718,7 @@ def main():
     def comp_hets_fn(parser, args):
         from gemini.gim import CompoundHet
         CompoundHet(args).run()
+
     parser_comp_hets.set_defaults(func=comp_hets_fn)
 
     #########################################
@@ -736,16 +746,19 @@ def main():
     def x_rec_fn(parser, args):
         from gemini.gim import XRec
         XRec(args).run()
+
     parser_xr.set_defaults(func=x_rec_fn)
 
     def x_dom_fn(parser, args):
         from gemini.gim import XDom
         XDom(args).run()
+
     parser_xd.set_defaults(func=x_dom_fn)
 
     def x_denovo_fn(parser, args):
         from gemini.gim import XDenovo
         XDenovo(args).run()
+
     parser_xdn.set_defaults(func=x_denovo_fn)
 
     #########################################
@@ -771,6 +784,7 @@ def main():
     def pathway_fn(parser, args):
         from gemini import tool_pathways
         tool_pathways.pathways(parser, args)
+
     parser_pathway.set_defaults(func=pathway_fn)
 
     #########################################
@@ -784,6 +798,7 @@ def main():
     def lof_sieve_fn(parser, args):
         from gemini import tool_lof_sieve
         tool_lof_sieve.lof_sieve(parser, args)
+
     parser_lof_sieve.set_defaults(func=lof_sieve_fn)
 
     #########################################
@@ -840,6 +855,7 @@ def main():
     def burden_fn(parser, args):
         from gemini import tool_burden_tests
         tool_burden_tests.burden(parser, args)
+
     parser_burden.set_defaults(func=burden_fn)
 
     #########################################
@@ -869,6 +885,7 @@ def main():
     def interactions_fn(parser, args):
         from gemini import tool_interactions
         tool_interactions.genequery(parser, args)
+
     parser_interaction.set_defaults(func=interactions_fn)
 
     #########################################
@@ -893,6 +910,7 @@ def main():
     def lof_interactions_fn(parser, args):
         from gemini import tool_interactions
         tool_interactions.lofgenequery(parser, args)
+
     parser_interaction.set_defaults(func=lof_interactions_fn)
 
     #########################################
@@ -907,6 +925,7 @@ def main():
     def autosomal_recessive_fn(parser, args):
         from gemini.gim import AutoRec
         AutoRec(args).run()
+
     parser_auto_rec.set_defaults(func=autosomal_recessive_fn)
 
     #########################################
@@ -920,6 +939,7 @@ def main():
     def autosomal_dominant_fn(parser, args):
         from gemini.gim import AutoDom
         AutoDom(args).run()
+
     parser_auto_dom.set_defaults(func=autosomal_dominant_fn)
 
     #########################################
@@ -933,6 +953,7 @@ def main():
     def de_novo_fn(parser, args):
         from gemini.gim import DeNovo
         DeNovo(args).run()
+
     parser_de_novo.set_defaults(func=de_novo_fn)
 
 
@@ -950,6 +971,7 @@ def main():
     def mendel_fn(parser, args):
         from gemini.gim import MendelViolations
         MendelViolations(args).run()
+
     parser_mendel.set_defaults(func=mendel_fn)
 
 
@@ -971,6 +993,7 @@ def main():
     def browser_fn(parser, args):
         from gemini import gemini_browser
         gemini_browser.browser_main(parser, args)
+
     parser_browser.set_defaults(func=browser_fn)
 
 
@@ -1052,6 +1075,7 @@ def main():
     def set_somatic_fn(parser, args):
         from gemini import gemini_set_somatic
         gemini_set_somatic.set_somatic(parser, args)
+
     parser_set_somatic.set_defaults(func=set_somatic_fn)
 
     #########################################
@@ -1064,6 +1088,7 @@ def main():
     def get_actionable_mut_fn(parser, args):
         from gemini import gemini_actionable_mutations
         gemini_actionable_mutations.get_actionable_mutations(parser, args)
+
     parser_actionable_mut.set_defaults(func=get_actionable_mut_fn)
 
 
@@ -1083,6 +1108,7 @@ def main():
     def update_fn(parser, args):
         from gemini import gemini_update
         gemini_update.release(parser, args)
+
     parser_update.set_defaults(func=update_fn)
 
 
@@ -1139,6 +1165,7 @@ def main():
     def homozygosity_runs_fn(parser, args):
         from gemini.tool_homozygosity_runs import run
         run(parser, args)
+
     parser_hom_run.set_defaults(func=homozygosity_runs_fn)
 
     #########################################
@@ -1156,6 +1183,7 @@ def main():
             create(args.db, [x.strip() for x in args.cols.split(",")])
         else:
             create(args.db)
+
     bci.set_defaults(func=bci_fn)
 
     #########################################
@@ -1185,6 +1213,7 @@ def main():
     def fusions_fn(parser, args):
         from gemini.tool_fusions import run
         run(parser, args)
+
     parser_fusions.set_defaults(func=fusions_fn)
 
     #########################################
@@ -1197,6 +1226,7 @@ def main():
     def genewise_run(parser, args):
         from gemini.genewise import run
         run(args)
+
     parser_genewise.set_defaults(func=genewise_run)
 
     #########################################
@@ -1220,6 +1250,7 @@ def main():
     def qc_fn(parser, args):
         from gemini.tool_qc import run
         run(parser, args)
+
     parser_qc.set_defaults(func=qc_fn)
 
     #######################################################
@@ -1233,18 +1264,22 @@ def main():
     args = parser.parse_args()
 
     # make sure database is found if provided
-    if len(sys.argv) > 2 and sys.argv[1] not in \
-       ["load", "merge_chunks", "load_chunk"]:
-        if hasattr(args, "db") and args.db is not None and not os.path.exists(args.db):
-            if not "://" in args.db:
+    if len(sys.argv) > 2:
+        if sys.argv[1] not in ["load", "merge_chunks", "load_chunk"]:
+            if (
+                hasattr(args, "db")
+                and args.db is not None
+                and not os.path.exists(args.db)
+                and not "://" in args.db
+            ):
                 sys.stderr.write("Requested GEMINI database (%s) not found. "
                                  "Please confirm the provided filename.\n"
                                  % args.db)
-    elif len(sys.argv) > 2 and sys.argv[1] == "load":
-        if xor(args.scheduler, args.queue):
-            parser.error("If you are using the IPython parallel loading, you "
-                         "must specify both a scheduler with --scheduler and a "
-                         "queue to use with --queue.")
+        elif sys.argv[1] == "load":
+            if xor(args.scheduler, args.queue):
+                parser.error("If you are using the IPython parallel loading, you "
+                             "must specify both a scheduler with --scheduler and a "
+                             "queue to use with --queue.")
     try:
         args.func(parser, args)
     except IOError as e:

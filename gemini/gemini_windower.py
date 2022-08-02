@@ -23,17 +23,16 @@ def get_window_data(conn, analysis_type, temp_file):
     elif analysis_type == "nucl_div":
         column = 'pi'
 
-    t = open(temp_file, 'w')
-    query = "SELECT chrom,start,end," + \
-        column + \
-        " FROM variants ORDER BY chrom,start"
-    for row in conn.execute(query):
-        if row[column] is not None:
-            t.write('%s\t%d\t%d\t%f\n' % (str(row['chrom']),
-                                          int(row['start']),
-                                          int(row['end']),
-                                          float(row[column])))
-    t.close()
+    with open(temp_file, 'w') as t:
+        query = "SELECT chrom,start,end," + \
+            column + \
+            " FROM variants ORDER BY chrom,start"
+        for row in conn.execute(query):
+            if row[column] is not None:
+                t.write('%s\t%d\t%d\t%f\n' % (str(row['chrom']),
+                                              int(row['start']),
+                                              int(row['end']),
+                                              float(row[column])))
     # Tell bedtools map that the statistic is in the fourth column.
     # Parameterized for future mods,
     return 4
@@ -66,9 +65,9 @@ def make_windows(conn, args, temp_file):
     for window in windowed_analysis:
         each = str(window).strip().split("\t")
         if args.op_type == "collapse" or each[3] is ".":
-            print("\t".join(each[0:]))
+            print("\t".join(each[:]))
         else:
-            print("\t".join(each[0:3])+"\t"+str(round(float(each[3]),4)))
+            print("\t".join(each[:3]) + "\t" + str(round(float(each[3]),4)))
 
     # cleanup
     os.remove(temp_file)
@@ -91,4 +90,6 @@ def check_dependencies(tool, deps):
         except OSError:
             retcode = 127
         if retcode == 127:
-            raise OSError("gemini %s requires %s. Please install and add to your PATH." % (tool, cmd[0]))
+            raise OSError(
+                f"gemini {tool} requires {cmd[0]}. Please install and add to your PATH."
+            )

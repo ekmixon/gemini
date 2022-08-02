@@ -62,9 +62,7 @@ def pack_blob(obj):
 
 def unpack_ordereddict_blob(blob):
     blob_val = pickle.loads(zlib.decompress(blob))
-    if blob_val is not None:
-        return OrderedDict(blob_val)
-    return None
+    return OrderedDict(blob_val) if blob_val is not None else None
 
 
 try:
@@ -85,7 +83,7 @@ if sys.version_info[0] == 3:
     def snappy_pack_blob(obj, sep=SEP):
         if obj is None: return ''
         c = obj.dtype.char
-        if c == 'S' or c == 'U':
+        if c in ['S', 'U']:
             return b'U' + snappy.compress(sep.join(obj))
         return buffer(c.encode('utf-8') + snappy.compress(obj.tobytes(), 'utf8'))
 
@@ -108,7 +106,8 @@ else:
     def snappy_pack_blob(obj, sep=SEP):
         if obj is None: return ''
         c = obj.dtype.char
-        if c == 'S': return 'S' + snappy.compress(sep.join(obj))
+        if c == 'S':
+            return f'S{snappy.compress(sep.join(obj))}'
         return buffer(c + snappy.compress(obj.tobytes()))
 
     def snappy_unpack_blob(blob, sep=SEP):

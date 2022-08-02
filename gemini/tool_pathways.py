@@ -59,10 +59,8 @@ def get_pathways(args):
 def _get_pathways(gene, transcript, pathways, allow_none=True):
     # get distinct pathways
     pathways = set(pathways)
-    if None in pathways:
-        # remove "None" if a valid pathway exists.
-        if len(pathways) > 1 or allow_none is False:
-           pathways.remove(None)
+    if None in pathways and (len(pathways) > 1 or allow_none is False):
+        pathways.remove(None)
     return pathways
 
 def _report_variant_pathways(res, args, idx_to_sample):
@@ -95,8 +93,7 @@ def _report_variant_pathways(res, args, idx_to_sample):
                             allow_none=False)
         pathlist = ",".join(pathways)
         for idx, gt_type in enumerate(gt_types):
-            if (gt_type == HET or gt_type == HOM_ALT) and \
-                len(pathways) > 0:
+            if gt_type in [HET, HOM_ALT] and len(pathways) > 0:
                 print("\t".join([r['chrom'], str(r['start']), str(r['end']), \
                                  r['ref'], r['alt'], r['impact'], \
                                  idx_to_sample[idx], gts[idx], gene, trans, \

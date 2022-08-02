@@ -138,8 +138,7 @@ def permute_cases(samples, permutations, case):
                          "%d\n." % (max_permutations))
         permutations = max_permutations
 
-    perms = take(permutations, unique_permutations(samples, len(case)))
-    return perms
+    return take(permutations, unique_permutations(samples, len(case)))
 
 def unique_permutations(iterable, length):
     """
@@ -290,5 +289,5 @@ def _test_calculate_T():
     yy = [2, 8, 0]
     correct = 10.5
 
-    calc = sum([_variant_T_term(0.5, n, y) for n, y in zip(nn, yy)])
+    calc = sum(_variant_T_term(0.5, n, y) for n, y in zip(nn, yy))
     assert correct == calc

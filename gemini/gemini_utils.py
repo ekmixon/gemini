@@ -18,9 +18,7 @@ ENC = locale.getpreferredencoding()
 def to_str(s, enc=ENC):
     if hasattr(s, "decode"):
         return s.decode(enc)
-    if isinstance(s, np.str_):
-        return str(s)
-    return s
+    return str(s) if isinstance(s, np.str_) else s
 
 from .gemini_subjects import Subject
 import sqlalchemy as sql
@@ -46,7 +44,7 @@ def get_col_names_and_indices(tbl, ignore_gt_cols=False):
     """Return a list of column names and a list of the row indices.
        Optionally exclude gt_* columns.
     """
-    inames = [(i, c) for i, c in enumerate(tbl.columns)]
+    inames = list(enumerate(tbl.columns))
     if ignore_gt_cols:
         inames = [x for x in inames if not (x[1].startswith("gt") and
                   x[1].type.__class__.__name__.upper() == "BLOB")]
@@ -103,9 +101,11 @@ class OrderedSet(collections.MutableSet):
         return key
 
     def __repr__(self):
-        if not self:
-            return '%s()' % (self.__class__.__name__,)
-        return '%s(%r)' % (self.__class__.__name__, list(self))
+        return (
+            '%s(%r)' % (self.__class__.__name__, list(self))
+            if self
+            else f'{self.__class__.__name__}()'
+        )
 
     def __eq__(self, other):
         if isinstance(other, OrderedSet):
@@ -165,8 +165,7 @@ def itersubclasses(cls, _seen=None):
         if sub not in _seen:
             _seen.add(sub)
             yield sub
-            for sub in itersubclasses(sub, _seen):
-                yield sub
+            yield from itersubclasses(sub, _seen)
 
 def partition(pred, iterable):
     'Use a predicate to partition entries into false entries and true entries'

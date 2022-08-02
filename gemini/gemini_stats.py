@@ -128,9 +128,15 @@ def get_sfs(conn, metadata, args):
     Report the site frequency spectrum
     """
     precision = 3
-    query = "SELECT round(aaf," + str(precision) + "), count(1) \
+    query = (
+        f"SELECT round(aaf,{precision}"
+        + "), count(1) \
              FROM variants \
-             GROUP BY round(aaf," + str(precision) + ")"
+             GROUP BY round(aaf,"
+        + str(precision)
+        + ")"
+    )
+
 
     res = conn.execute(sql.text(query))
     print('\t'.join(['aaf', 'count']))
@@ -142,11 +148,8 @@ def get_mds(conn, metadata, args):
     """
     Compute the pairwise genetic distance between each sample.
     """
-    idx_to_sample = {}
     res = conn.execute(sql.text("select sample_id, name from samples"))
-    for row in res:
-        idx_to_sample[int(row['sample_id']) - 1] = row['name']
-
+    idx_to_sample = {int(row['sample_id']) - 1: row['name'] for row in res}
     query = "SELECT DISTINCT v.variant_id, v.gt_types\
     FROM variants v\
     WHERE v.type = 'snp'"

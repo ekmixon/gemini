@@ -14,6 +14,7 @@ Requires: Python 2.7 (or 2.6 and argparse), git, and compilers (gcc, g++)
 
 Run gemini_install.py -h for usage.
 """
+
 from __future__ import print_function
 import argparse
 import platform
@@ -32,14 +33,15 @@ remotes = {"requirements_conda": "",
            "anaconda": "http://repo.continuum.io/miniconda/Miniconda2-latest-%s-x86%s.sh"}
 
 remotes_dev = remotes.copy()
-remotes_dev.update({
-    "requirements_conda": "https://raw.githubusercontent.com/arq5x/gemini/dev/versioning/unstable/requirements_conda.txt",
-})
+remotes_dev[
+    "requirements_conda"
+] = "https://raw.githubusercontent.com/arq5x/gemini/dev/versioning/unstable/requirements_conda.txt"
+
 
 remotes_bp = remotes_dev
-remotes_bp.update({
-    "requirements_conda": "https://raw.githubusercontent.com/brentp/gemini/dev/versioning/unstable/requirements_conda.txt",
-})
+remotes_bp[
+    "requirements_conda"
+] = "https://raw.githubusercontent.com/brentp/gemini/dev/versioning/unstable/requirements_conda.txt"
 
 def main(args, remotes=remotes):
     check_dependencies()
@@ -50,11 +52,7 @@ def main(args, remotes=remotes):
     os.chdir(work_dir)
 
     if args.gemini_version in ("unstable", "bp"):
-        if args.gemini_version == "unstable":
-            remotes = remotes_dev
-        else:
-            remotes = remotes_bp
-
+        remotes = remotes_dev if args.gemini_version == "unstable" else remotes_bp
         requirements_conda = remotes['requirements_conda']
         urllib.urlretrieve(requirements_conda, filename='_conda_dev.txt')
 
@@ -73,7 +71,10 @@ def main(args, remotes=remotes):
         try:
             urlopen(requirements_conda)
         except:
-            raise ValueError('Gemini version %s could not be found. Try the latest version.' % args.gemini_version)
+            raise ValueError(
+                f'Gemini version {args.gemini_version} could not be found. Try the latest version.'
+            )
+
         remotes.update({'requirements_conda': requirements_conda})
 
     print("Installing isolated base python installation")
@@ -85,7 +86,7 @@ def main(args, remotes=remotes):
     print("Finished: gemini, tools and data installed")
     if args.tooldir:
         print(" Tools installed in:\n  %s" % args.tooldir)
-        print(" NOTE: be sure to add %s/bin to your PATH." % args.tooldir)
+        print(f" NOTE: be sure to add {args.tooldir}/bin to your PATH.")
     if args.install_data:
         print(" Data installed in:\n  %s" % args.datadir)
         print(" NOTE: Install data files for GERP_bp & CADD_scores (not installed by default).\n ")
@@ -94,7 +95,7 @@ def main(args, remotes=remotes):
 
 def install_conda_pkgs(anaconda, remotes, args):
     if args.gemini_version != 'latest':
-        req_file = '_conda-requirements-%s.txt' % args.gemini_version
+        req_file = f'_conda-requirements-{args.gemini_version}.txt'
         urllib.urlretrieve(remotes["requirements_conda"], filename=req_file)
         pkgs = ["--file", req_file]
     else:
@@ -114,22 +115,18 @@ def install_anaconda_python(args, remotes):
     anaconda_dir = os.path.join(args.datadir, "anaconda")
     bindir = os.path.join(anaconda_dir, "bin")
     conda = os.path.join(bindir, "conda")
-    if platform.mac_ver()[0]:
-        distribution = "macosx"
-    else:
-        distribution = "linux"
-    if platform.architecture()[0] == "32bit":
-        arch = ""
-    else:
-        arch = "_64"
+    distribution = "macosx" if platform.mac_ver()[0] else "linux"
+    arch = "" if platform.architecture()[0] == "32bit" else "_64"
     if not os.path.exists(anaconda_dir) or not os.path.exists(conda):
         if os.path.exists(anaconda_dir):
             shutil.rmtree(anaconda_dir)
         url = remotes["anaconda"] % ("MacOSX" if distribution == "macosx" else "Linux", arch)
         if not os.path.exists(os.path.basename(url)):
             subprocess.check_call(["wget", "--continue", "--no-check-certificate", url])
-        subprocess.check_call("bash %s -b -p %s" %
-                              (os.path.basename(url), anaconda_dir), shell=True)
+        subprocess.check_call(
+            f"bash {os.path.basename(url)} -b -p {anaconda_dir}", shell=True
+        )
+
     return {"conda": conda,
             "dir": anaconda_dir}
 
@@ -171,9 +168,9 @@ def check_dependencies():
         except OSError:
             retcode = 127
         if retcode == 127:
-            raise OSError("gemini requires %s (%s)" % (cmd, url))
+            raise OSError(f"gemini requires {cmd} ({url})")
         else:
-            print(" %s found" % cmd)
+            print(f" {cmd} found")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Automated installer for gemini framework.")

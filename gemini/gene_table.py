@@ -66,7 +66,7 @@ def update_cosmic_census_genes(session, metadata, args):
     for line in open(file, 'r'):
         fields = line.strip().split("\t")
         gene = fields[0]
-        chrom = "chr" + fields[3]
+        chrom = f"chr{fields[3]}"
         cosmic_census_genes.append((1, gene, chrom))
 
     database.update_gene_summary_w_cancer_census(session, metadata, cosmic_census_genes)

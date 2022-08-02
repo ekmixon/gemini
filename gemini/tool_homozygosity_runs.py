@@ -51,8 +51,8 @@ def _prune_run(run):
         # no interuptions, return an empty list
         return 0, 0, len(run), []
 
-    hets_removed = run[0:idx_of_first_disruption+1].count('H')
-    unks_removed = run[0:idx_of_first_disruption+1].count('U')
+    hets_removed = run[:idx_of_first_disruption+1].count('H')
+    unks_removed = run[:idx_of_first_disruption+1].count('U')
     homs_removed = idx_of_first_disruption - (hets_removed + unks_removed) + 1
 
     return hets_removed, unks_removed, homs_removed, run[idx_of_first_disruption+1:]
@@ -88,13 +88,13 @@ def sweep_genotypes_for_rohs(args, chrom, samples):
             # sweep through the active sites until we encounter
             # too many HETS or UNKNOWN genotypes.
             while het_count <= args.max_hets and unk_count <= args.max_unknowns:
-                if site != 'H' and site != 'U':
+                if site not in ['H', 'U']:
                     hom_count +=1
                     curr_run.append(site)
                 elif site == 'H':
                     curr_run.append(site)
                     het_count += 1
-                elif site == 'U':
+                else:
                     curr_run.append(site)
                     unk_count += 1
                 try:

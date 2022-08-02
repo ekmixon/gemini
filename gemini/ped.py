@@ -4,9 +4,10 @@ Tries to parse as tab-delimited if files contain tabs, otherwise splits
 on whitespace.
 """
 
+
 default_ped_fields = ["family_id", "name", "paternal_id", "maternal_id",
                       "sex", "phenotype"]
-missing_member = set(["None", None, "0", "-9"])
+missing_member = {"None", None, "0", "-9"}
 
 def get_ped_fields(ped_file):
     if not ped_file:
@@ -15,16 +16,17 @@ def get_ped_fields(ped_file):
     with open(ped_file) as in_handle:
         possible_header = in_handle.readline()
 
-    if possible_header.startswith("#"):
-        if possible_header.count("\t") > 1:
-            header = possible_header.replace("#", "").rstrip().split("\t")
-        else:
-            header = possible_header.replace("#", "").split()
-        # rename the standard fields to a common name
-        header = default_ped_fields + header[len(default_ped_fields):]
-        return header
-    else:
+    if not possible_header.startswith("#"):
         return default_ped_fields
+    header = (
+        possible_header.replace("#", "").rstrip().split("\t")
+        if possible_header.count("\t") > 1
+        else possible_header.replace("#", "").split()
+    )
+
+    # rename the standard fields to a common name
+    header = default_ped_fields + header[len(default_ped_fields):]
+    return header
 
 def load_ped_file(ped_file):
     ped_dict = {}

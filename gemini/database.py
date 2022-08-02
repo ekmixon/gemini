@@ -94,8 +94,8 @@ def create_indices(cursor):
 def get_path(path):
     if "://" not in path:
         if not (os.path.exists(path) or os.access(os.path.dirname(os.path.abspath(path)), os.W_OK)):
-            raise Exception("unable to find path: %s" % path)
-        path = "sqlite:///%s" % path
+            raise Exception(f"unable to find path: {path}")
+        path = f"sqlite:///{path}"
 
     return path
 
@@ -393,12 +393,10 @@ def create_tables(path, effect_fields=None, pls=True):
     metadata = sql.MetaData(bind=e)
 
     session = create_session(bind=e, autocommit=False, autoflush=False)
-    mapped = {}
     tables = ['variants'] + [x for x in sorted(db) if x != 'variants']
     otables = [sql.Table(tbl, metadata, *db[tbl]) for tbl in tables]
     metadata.drop_all(tables=otables)
-    for t in otables:
-        mapped[t.name] = t
+    mapped = {t.name: t for t in otables}
     session.commit()
 
     metadata.create_all()
@@ -439,11 +437,8 @@ def insert_variation(session, metadata, buffer):
         session.execute(tbl.insert(), buffer)
         session.commit()
     except:
-        try:
+        with contextlib.suppress(sql.exc.OperationalError):
             session.rollback()
-        except sql.exc.OperationalError:
-            pass
-
         for b in buffer:
             for k, v in b.items():
                 if isinstance(v, str):
@@ -453,12 +448,8 @@ def insert_variation(session, metadata, buffer):
             session.commit()
         except:
             sys.stderr.write("insert error trying 1 at a time:\n")
-            try:
+            with contextlib.suppress(sql.exc.OperationalError):
                 session.rollback()
-            except sql.exc.OperationalError:
-                pass
-
-
             stmt = tbl.insert()
 
             with session.bind.begin() as trans:
@@ -493,7 +484,7 @@ def _get_cols(tbl):
 def gen_gene_vals(cols, table_contents):
     for row in table_contents:
         d = dict(zip(cols, row))
-        d['is_hgnc'] = bool(d['is_hgnc'] != '0')
+        d['is_hgnc'] = d['is_hgnc'] != '0'
         if d['rvis_pct'] in (None, 'None'):
             d['rvis_pct'] = None
         else:

@@ -22,30 +22,26 @@ Output: hprd_interaction_graph
 """
 
 gr = graph()
-output = open('hprd_interaction_graph', 'wb')
+with open('hprd_interaction_graph', 'wb') as output:
+    for line in open("BINARY_PROTEIN_PROTEIN_INTERACTIONS.txt", 'r'):
+        fields=line.strip().split("\t")
+        first = str(fields[0])
+        second = str(fields[3])
+        if first != "-":
+            try:
+                gr.add_nodes([first])
+            except AdditionError:
+                pass;
+        if second != "-":
+            try:
+                gr.add_nodes([second])
+            except AdditionError:
+                pass;
 
-for line in open("BINARY_PROTEIN_PROTEIN_INTERACTIONS.txt", 'r'):
-    fields=line.strip().split("\t")
-    first = str(fields[0])
-    second = str(fields[3])
-    if first != "-":
-        try:
-            gr.add_nodes([first])
-        except AdditionError:
-            pass;
-    if second != "-":
-        try:
-            gr.add_nodes([second])
-        except AdditionError:
-            pass;
+        if first != "-" and second != "-" and first != second:
+            try:
+                gr.add_edge((first, second))
+            except AdditionError:
+                pass;
 
-    if (first == "-" or second == "-" or first == second):
-        pass;
-    else:
-        try:
-            gr.add_edge((first, second))
-        except AdditionError:
-            pass;
-
-cPickle.dump(gr, output)
-output.close()
+    cPickle.dump(gr, output)

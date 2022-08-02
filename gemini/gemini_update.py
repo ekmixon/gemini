@@ -22,8 +22,10 @@ def release(parser, args):
         subprocess.check_call([conda_bin, "install", "-y", "-c", "conda-forge", "-c", "bioconda",
                                "gemini", "cyvcf2", "pip"])
         if args.devel:
-            subprocess.check_call([pip_bin, "install", "--upgrade", "--no-deps",
-                                   "git+%s" % repo])
+            subprocess.check_call(
+                [pip_bin, "install", "--upgrade", "--no-deps", f"git+{repo}"]
+            )
+
         print("Gemini upgraded to latest version")
     if args.tooldir:
         print("Upgrading associated tools...")
@@ -34,7 +36,7 @@ def release(parser, args):
     config = gemini.config.read_gemini_config(args=args, allow_missing=True)
     gemini.config.write_gemini_config(config)
     if args.install_data:
-        extra_args = ["--extra=%s" % x for x in args.extra]
+        extra_args = [f"--extra={x}" for x in args.extra]
         subprocess.check_call([sys.executable, _get_install_script(), config["annotation_dir"]] + extra_args)
         print("Gemini data files updated")
     # update tests
@@ -62,13 +64,13 @@ def _update_testbase(repo_dir, repo, gemini_cmd):
             os.chdir(cur_dir)
             shutil.rmtree(repo_dir)
     if needs_git:
-        print("cloning %s to %s" % (repo, repo_dir))
+        print(f"cloning {repo} to {repo_dir}")
         subprocess.check_call(["git", "clone", repo, repo_dir])
     os.chdir(repo_dir)
     try:
         _update_testdir_revision(gemini_cmd)
     except Exception as msg:
-        print("Unable to update to revision, skipping: %s" % msg)
+        print(f"Unable to update to revision, skipping: {msg}")
     os.chdir(cur_dir)
 
 def _update_testdir_revision(gemini_cmd):
@@ -82,13 +84,17 @@ def _update_testdir_revision(gemini_cmd):
     tag = ""
     if gversion:
         try:
-            p = subprocess.Popen("git tag -l | grep %s$" % gversion, stdout=subprocess.PIPE, shell=True)
+            p = subprocess.Popen(
+                f"git tag -l | grep {gversion}$",
+                stdout=subprocess.PIPE,
+                shell=True,
+            )
+
             tag = p.communicate()[0].strip()
         except:
             tag = ""
     if tag:
-        subprocess.check_call(["git", "checkout", "tags/%s" % tag])
-        pass
+        subprocess.check_call(["git", "checkout", f"tags/{tag}"])
     else:
         subprocess.check_call(["git", "reset", "--hard", "HEAD"])
 
@@ -102,7 +108,7 @@ def link_tools(tooldir, anaconda_dir):
             ("gemini_", "python"), ("gemini_", "conda"), ("gemini_", "pip")]
     for prefix, binfile in bins:
         orig_file = os.path.join(anaconda_dir, "bin", binfile)
-        final_file = os.path.join(bin_dir, "%s%s" % (prefix, binfile))
+        final_file = os.path.join(bin_dir, f"{prefix}{binfile}")
         if os.path.exists(orig_file):
             _do_link(orig_file, final_file)
 

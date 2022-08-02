@@ -33,8 +33,7 @@ def get_region(args, gq):
     end = region[2]
 
     if args.columns is not None:
-        query = "SELECT " + str(args.columns) + \
-                    " FROM variants "
+        query = (f"SELECT {str(args.columns)}" + " FROM variants ")
     else:
         query = "SELECT * FROM variants "
 
@@ -43,7 +42,7 @@ def get_region(args, gq):
         " OR (end BETWEEN " + start + " AND " + end + "))"
 
     if args.filter:
-        query += " AND " + args.filter
+        query += f" AND {args.filter}"
 
     query += " ORDER BY chrom, start"
 
@@ -56,15 +55,14 @@ def get_gene(args, gq):
     Report all variants in a specific gene.
     """
     if args.columns is not None:
-        query = "SELECT " + str(args.columns) + \
-                    " FROM variants "
+        query = (f"SELECT {str(args.columns)}" + " FROM variants ")
     else:
         query = "SELECT * FROM variants "
 
     query += "WHERE gene = " + "'" + args.gene + "' "
 
     if args.filter:
-        query += " AND " + args.filter
+        query += f" AND {args.filter}"
 
     query += " ORDER BY chrom, start"
 
@@ -95,10 +93,10 @@ def add_region_to_query(args):
 
 def _add_to_where_clause(query, where_clause):
     where_index = query.lower().find("where")
-    prefix = query[0:where_index]
+    prefix = query[:where_index]
     suffix = query[where_index + len("where"):]
     if where_index == -1:
-        query += " WHERE " + where_clause
+        query += f" WHERE {where_clause}"
     else:
         query = "{0} WHERE ({1}) AND ({2})".format(prefix, suffix, where_clause)
     return query

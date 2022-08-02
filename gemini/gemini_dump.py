@@ -23,7 +23,7 @@ def get_variants(conn, metadata, args):
         util.get_col_names_and_indices(metadata.tables["variants"], ignore_gt_cols=True)
 
     if args.use_header:
-        print(args.separator.join(col for col in col_names))
+        print(args.separator.join(iter(col_names)))
     for row in res:
         print(args.separator.join('.' if (row[i] is None) else
                                   row[i].encode('utf-8') if type(row[i]) is
@@ -54,7 +54,7 @@ def get_genotypes(conn, metadata, args):
     col_names.append('genotype')
 
     if args.use_header:
-        print(args.separator.join(col for col in col_names))
+        print(args.separator.join(iter(col_names)))
 
     unpack = Z.unpack_genotype_blob
     import zlib

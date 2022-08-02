@@ -183,10 +183,7 @@ def merge_db_chunks(args):
     main_curr.execute('PRAGMA synchronous = OFF')
     main_curr.execute('PRAGMA journal_mode=MEMORY')
 
-    databases = []
-    for database in args.chunkdbs:
-        databases.append(database)
-
+    databases = list(args.chunkdbs)
     for idx, database in enumerate(databases):
 
         db = database[0]
@@ -217,14 +214,17 @@ def merge_chunks(parser, args):
     for try_count in range(2):
         try:
             if try_count > 0:
-                tmp_dbs = [os.path.join(args.tempdir, "%s.db" % uuid.uuid4())
-                           for _ in args.chunkdbs]
+                tmp_dbs = [
+                    os.path.join(args.tempdir, f"{uuid.uuid4()}.db")
+                    for _ in args.chunkdbs
+                ]
+
                 for chunk_db, tmp_db in zip(args.chunkdbs, tmp_dbs):
                     shutil.copyfile(chunk_db[0], tmp_db)
                     chunk_db[0] = tmp_db
 
                 output_db = args.db
-                args.db = os.path.join(args.tempdir, "%s.db" % uuid.uuid4())
+                args.db = os.path.join(args.tempdir, f"{uuid.uuid4()}.db")
 
             merge_db_chunks(args)
 

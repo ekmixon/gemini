@@ -12,9 +12,9 @@ def tag_somatic_mutations(args):
 
     depth_string, qual_string, ssc_string, chrom_string = ("", "", "", "")
     if args.min_depth:
-        depth_string = " AND depth >= %s" % args.min_depth
+        depth_string = f" AND depth >= {args.min_depth}"
     if args.min_qual:
-        qual_string = " AND qual >= %s" % args.min_qual
+        qual_string = f" AND qual >= {args.min_qual}"
     if args.min_somatic_score:
         ssc_string = " AND (type='sv' \
                          OR somatic_score >= %s)" % args.min_somatic_score
@@ -125,9 +125,10 @@ def tag_somatic_mutations(args):
         from . import database
         conn, metadata = database.get_session_metadata(args.db)
 
-        # now set the identified mutations to True.
-        update_qry = "UPDATE variants SET is_somatic = 1 "
-        update_qry += " WHERE variant_id IN (%s)"
+        update_qry = (
+            "UPDATE variants SET is_somatic = 1 " + " WHERE variant_id IN (%s)"
+        )
+
         update_qry %= ",".join(str(x[1]) for x in somatic_v_ids)
         res = conn.execute(update_qry)
         assert res.rowcount == somatic_counter

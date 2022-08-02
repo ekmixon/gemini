@@ -238,7 +238,7 @@ def _get_hits(coords, annotation, parser_type, _parsers=PARSERS):
     try:
         parser = _parsers[parser_type]
     except KeyError:
-        raise ValueError("Unexpected parser type: %s" % parser)
+        raise ValueError(f"Unexpected parser type: {parser}")
     chrom, start, end = coords
     if isinstance(annotation, pysam.VariantFile):
         return annotation.fetch(chrom, start, end)
@@ -246,11 +246,7 @@ def _get_hits(coords, annotation, parser_type, _parsers=PARSERS):
         return annotation("%s:%d-%d" % (chrom, start - 1, end))
     try:
         hit_iter = annotation.fetch(str(chrom), start, end, parser=parser)
-    # catch invalid region errors raised by ctabix
-    except ValueError:
-        hit_iter = []
-    # recent versions of pysam return KeyError
-    except KeyError:
+    except (ValueError, KeyError):
         hit_iter = []
     except:
         print(annotation.__class__, file=sys.stderr)
@@ -270,21 +266,18 @@ def _get_bw_summary(coords, annotation):
 def _get_chr_as_grch37(chrom):
     if chrom in ["chrM"]:
         return "MT"
-    return chrom if not chrom.startswith("chr") else chrom[3:]
+    return chrom[3:] if chrom.startswith("chr") else chrom
 
 
 def _get_chr_as_ucsc(chrom):
-    return chrom if chrom.startswith("chr") else "chr" + chrom
+    return chrom if chrom.startswith("chr") else f"chr{chrom}"
 
 
 def guess_contig_naming(anno):
     """Guess which contig naming scheme a given annotation file uses.
     """
     chr_names = [x for x in anno.contigs if x.startswith("chr")]
-    if len(chr_names) > 0:
-        return "ucsc"
-    else:
-        return "grch37"
+    return "ucsc" if chr_names else "grch37"
 
 
 def _get_var_coords(var, naming):
@@ -454,7 +447,7 @@ def get_cpg_island_info(var):
     Returns a boolean indicating whether or not the
     variant overlaps a CpG island
     """
-    for hit in annotations_in_region(var, "cpg_island", "bed"):
+    for _ in annotations_in_region(var, "cpg_island", "bed"):
         return True
     return False
 
@@ -497,7 +490,7 @@ def get_cyto_info(var):
     cyto_band = ''
     for hit in annotations_in_region(var, "cytoband", "bed"):
         if len(cyto_band) > 0:
-            cyto_band += "," + hit.contig + hit.name
+            cyto_band += f",{hit.contig}{hit.name}"
         else:
             cyto_band += hit.contig + hit.name
     return cyto_band if len(cyto_band) > 0 else None
@@ -509,16 +502,16 @@ def get_gerp_bp(var):
     if "gerp_bp" not in annos:
         raise IOError("Need to download BigWig file with GERP scores per base pair. "
                       "Run `gemini update --dataonly --extra gerp_bp")
-    gerp = bigwig_summary(var, "gerp_bp")
-    return gerp
+    return bigwig_summary(var, "gerp_bp")
 
 def get_gerp_elements(var):
     """
     Returns the GERP element information.
     """
-    p_vals = []
-    for hit in annotations_in_region(var, "gerp_elements", "tuple"):
-        p_vals.append(hit[3])
+    p_vals = [
+        hit[3] for hit in annotations_in_region(var, "gerp_elements", "tuple")
+    ]
+
     if len(p_vals) == 1:
         return p_vals[0]
     elif len(p_vals) > 1:
@@ -530,18 +523,19 @@ def get_vista_enhancers(var):
     """
     Returns the VISTA enhancer information.
     """
-    vista_enhancers = []
-    for hit in annotations_in_region(var, "vista_enhancers", "tuple"):
-        vista_enhancers.append(hit[4])
-    return ",".join(vista_enhancers) if len(vista_enhancers) > 0 else None
+    vista_enhancers = [
+        hit[4]
+        for hit in annotations_in_region(var, "vista_enhancers", "tuple")
+    ]
+
+    return ",".join(vista_enhancers) if vista_enhancers else None
 
 def get_fitcons(var):
     hmax = float('nan')
     for hit in annotations_in_region(var, "fitcons", None, "ucsc"):
         _, val = hit.rsplit("\t", 1)
         v = float(val)
-        if not hmax > v:
-            hmax = v
+        hmax = max(hmax, v)
     return hmax
 
 def get_cadd_scores(var):
@@ -578,10 +572,11 @@ def get_pfamA_domains(var):
     """
     Returns pfamA domains that a variant overlaps
     """
-    pfam_domain = []
-    for hit in annotations_in_region(var, "pfam_domain", "bed"):
-        pfam_domain.append(hit.name)
-    return ",".join(pfam_domain) if len(pfam_domain) > 0 else None
+    pfam_domain = [
+        hit.name for hit in annotations_in_region(var, "pfam_domain", "bed")
+    ]
+
+    return ",".join(pfam_domain) if pfam_domain else None
 
 
 def get_cosmic_info(var):
@@ -601,10 +596,11 @@ def get_cosmic_info(var):
     chr1    42880415    COSM909630  G   C   .   .   AA=p.G275R;CDS=c.823G>C;CNT=1;GENE=RIMKLA;STRAND=+
     """
     # report the first overlapping ClinVar variant Most often, just one).
-    cosmic_ids = []
-    for hit in annotations_in_vcf(var, "cosmic", "vcf", "grch37"):
-        cosmic_ids.append(hit.id)
-    return ",".join(cosmic_ids) if len(cosmic_ids) > 0 else None
+    cosmic_ids = [
+        hit.id for hit in annotations_in_vcf(var, "cosmic", "vcf", "grch37")
+    ]
+
+    return ",".join(cosmic_ids) if cosmic_ids else None
 
 
 def get_clinvar_info(var):
@@ -660,10 +656,8 @@ def get_dbsnp_info(var):
     """
     Returns a suite of annotations from dbSNP
     """
-    rs_ids = []
-    for hit in annotations_in_vcf(var, "dbsnp", "vcf", "grch37"):
-        rs_ids.append(hit.id)
-    return ",".join(rs_ids) if len(rs_ids) > 0 else None
+    rs_ids = [hit.id for hit in annotations_in_vcf(var, "dbsnp", "vcf", "grch37")]
+    return ",".join(rs_ids) if rs_ids else None
 
 
 def get_esp_info(var):
@@ -706,21 +700,16 @@ def get_esp_info(var):
                     if info_map.get(key) is not None:
                         lines = info_map[key].split(",")
                         denom = float(lines[0]) + float(lines[1])
-                        if denom == 0:
-                            acs[key] = 0
-                        else:
-                            # alt allele is stored as 2nd.
-                            acs[key] = float(lines[1]) / denom
+                        acs[key] = 0 if denom == 0 else float(lines[1]) / denom
                     else:
                         acs[key] = -1
 
                 # Is the SNP on an human exome chip?
-                if info_map.get('EXOME_CHIP') is not None and \
-                        info_map['EXOME_CHIP'] == "no":
-                    exome_chip = 0
-                elif info_map.get('EXOME_CHIP') is not None and \
-                        info_map['EXOME_CHIP'] == "yes":
-                    exome_chip = 1
+                if info_map.get('EXOME_CHIP') is not None:
+                    if info_map['EXOME_CHIP'] == "no":
+                        exome_chip = 0
+                    elif info_map['EXOME_CHIP'] == "yes":
+                        exome_chip = 1
                 break
     return ESPInfo(found, acs.get('EA_AC', -1), acs.get("AA_AC", -1),
             acs.get("TAC", -1), exome_chip)
@@ -756,13 +745,12 @@ def get_1000G_info(var, empty=EMPTY_1000G):
 def get_geno2mp_ct(var):
 
     for hit in annotations_in_vcf(var, "geno2mp", "vcf", "grch37"):
-        if not (var.start == hit.pos and var.REF == hit.ref):
+        if var.start != hit.pos or var.REF != hit.ref:
             continue
-        if not var.ALT[0] in hit.alt.split(","): continue
+        if var.ALT[0] not in hit.alt.split(","): continue
 
         ct = next(x for x in hit.info.split(";") if x.startswith("HPO_CT="))
-        val = int(ct.split("=")[1])
-        return val
+        return int(ct.split("=")[1])
     # missing is -1
     return -1
 
@@ -783,10 +771,10 @@ def get_gnomad_info(var, empty=GNOMAD_EMPTY):
         aaf_ALL = info_map.get("AF", -1.0)
 
         for grp in ('_afr', '_amr', '_asj', '_eas', '_fin', '_nfe', '_oth', '_sas'):
-            ac = info_map.get('AC' + grp)
+            ac = info_map.get(f'AC{grp}')
             if ac is None: continue
 
-            an = info_map.get('AN' + grp)
+            an = info_map.get(f'AN{grp}')
             if an is None: continue
 
             if an == 0:
@@ -830,7 +818,7 @@ def get_exac_info(var, empty=EXAC_EMPTY):
         # Does not handle anything beyond var.ALT[0] in the VCF (in case of multi-allelic variants)
         # var.start is used since the chromosomal pos in pysam.asVCF is zero based (hit.pos)
         # and would be equivalent to (POS-1) i.e var.start
-        if not (var.start == hit.pos and var.REF == hit.ref):
+        if var.start != hit.pos or var.REF != hit.ref:
             continue
 
         # This would look for var.ALT[0] matches to
@@ -853,10 +841,10 @@ def get_exac_info(var, empty=EXAC_EMPTY):
                 aaf_ALL = -1
 
             for grp in ('Adj', 'AFR', 'AMR', 'EAS', 'FIN', 'NFE', 'OTH', 'SAS'):
-                ac = info_map.get('AC_%s' % grp)
+                ac = info_map.get(f'AC_{grp}')
                 if ac is None: continue
 
-                an = info_map.get('AN_%s' % grp)
+                an = info_map.get(f'AN_{grp}')
                 if an is None: continue
 
                 if an == '0':
@@ -883,10 +871,8 @@ def get_rmsk_info(var):
     Returns a comma-separated list of annotated repeats
     that overlap a variant.  Derived from the UCSC rmsk track
     """
-    rmsk_hits = []
-    for hit in annotations_in_region(var, "rmsk", "bed"):
-        rmsk_hits.append(hit.name)
-    return ",".join(rmsk_hits) if len(rmsk_hits) > 0 else None
+    rmsk_hits = [hit.name for hit in annotations_in_region(var, "rmsk", "bed")]
+    return ",".join(rmsk_hits) if rmsk_hits else None
 
 
 def get_segdup_info(var):
@@ -894,7 +880,7 @@ def get_segdup_info(var):
     Returns a boolean indicating whether or not the
     variant overlaps a known segmental duplication.
     """
-    for hit in annotations_in_region(var, "segdup", "bed"):
+    for _ in annotations_in_region(var, "segdup", "bed"):
         return True
     return False
 
@@ -913,7 +899,7 @@ def get_conservation_info(var):
     # Script to convert for gemini:
     gemini/annotation_provenance/make-29way-conservation.sh
     """
-    for hit in annotations_in_region(var, "conserved", "bed"):
+    for _ in annotations_in_region(var, "conserved", "bed"):
         return True
     return False
 
@@ -936,8 +922,7 @@ def get_recomb_info(var):
 
 def _get_first_vcf_hit(hit_iter):
     if hit_iter is not None:
-        hits = list(hit_iter)
-        if len(hits) > 0:
+        if hits := list(hit_iter):
             return hits[0]
 
 
@@ -963,15 +948,16 @@ def get_gms(var):
 def get_grc(var):
     """Return GRC patched genome regions.
     """
-    regions = set()
-    for hit in annotations_in_region(var, "grc", "bed", "grch37"):
-        regions.add(hit.name)
-    return ",".join(sorted(list(regions))) if len(regions) > 0 else None
+    regions = {
+        hit.name for hit in annotations_in_region(var, "grc", "bed", "grch37")
+    }
+
+    return ",".join(sorted(list(regions))) if regions else None
 
 def get_cse(var):
     """Return if a variant is in a CSE: Context-specific error region.
     """
-    for hit in annotations_in_region(var, "cse", "bed", "grch37"):
+    for _ in annotations_in_region(var, "cse", "bed", "grch37"):
         return True
     return False
 
@@ -987,13 +973,12 @@ def get_encode_tfbs(var):
     tolerate BED files with more than 12 fields, so we just use the base
     tuple parser and grab the name column (4th column)
     """
-    tfbs = []
-    for hit in annotations_in_region(var, "encode_tfbs", "tuple"):
-        tfbs.append(hit[3] + "_" + hit[4])
-    if len(tfbs) > 0:
-        return ','.join(tfbs)
-    else:
-        return None
+    tfbs = [
+        f"{hit[3]}_{hit[4]}"
+        for hit in annotations_in_region(var, "encode_tfbs", "tuple")
+    ]
+
+    return ','.join(tfbs) if tfbs else None
 
 
 def get_encode_dnase_clusters(var):

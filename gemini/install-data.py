@@ -94,7 +94,7 @@ def install_annotation_files(anno_root_dir, dl_files=False, extra=None):
         if not os.path.exists(anno_dir):
             os.makedirs(anno_dir)
         if not os.path.isdir(anno_dir):
-            raise IOError(anno_dir + " is not a valid directory.")
+            raise IOError(f"{anno_dir} is not a valid directory.")
         to_dl = anno_files[:]
         if extra:
             to_dl += [extra_anno_files[x] for x in extra]
@@ -108,9 +108,9 @@ def _download_anno_files(base_url, file_names, anno_dir, cur_config):
     """
     for orig in file_names:
         if orig.endswith(".gz") and not orig.endswith("hprd_interaction_edges.gz"):
-            dls = [orig, "%s.tbi" % orig]
+            dls = [orig, f"{orig}.tbi"]
         elif orig.endswith(".bcf"):
-            dls = [orig, "%s.csi" % orig]
+            dls = [orig, f"{orig}.csi"]
         else:
             dls = [orig]
         for dl in dls:
@@ -125,7 +125,7 @@ def _download_to_dir(url, out_fname, dirname, version, cur_version):
     """
     Grab an annotation file and place in /usr/share/gemini/data
     """
-    print("* downloading " + url + " to " + dirname + "\n")
+    print(f"* downloading {url} to {dirname}" + "\n")
     dest = os.path.join(dirname, out_fname)
     if not os.path.exists(dest) or version > cur_version:
         # download data file to staging directory instead of current
@@ -143,18 +143,19 @@ def _download_to_dir(url, out_fname, dirname, version, cur_version):
             retcode = subprocess.call(cmd)
             if retcode == 0:
                 break
-            else:
-                print("wget failed with non-zero exit code %s. Retrying" %
-                      retcode)
-                if retries >= max_retries:
-                    raise ValueError("Failed to download with wget")
-                time.sleep(10)
-                retries += 1
+            print(f"wget failed with non-zero exit code {retcode}. Retrying")
+            if retries >= max_retries:
+                raise ValueError("Failed to download with wget")
+            time.sleep(10)
+            retries += 1
         with open(out_fname) as in_handle:
             line1 = in_handle.readline()
             line2 = in_handle.readline()
             if "?xml" in line1 and "Error" in line2 and "AccessDenied" in line2:
-                raise ValueError("Could not download annotation file. Permission denied error: %s" % url)
+                raise ValueError(
+                    f"Could not download annotation file. Permission denied error: {url}"
+                )
+
         # move to system directory (/usr/share/gemini/data) and remove from pwd
         shutil.move(out_fname, dest)
         os.chdir(orig_dir)

@@ -47,19 +47,21 @@ def report_fusion(event, subjects_dict, args):
             break # just get the first gene interrupted by the breakend
 
         # Break if breakpoint2 is intergenic
-        if gene2 == None:
+        if gene2 is None:
             return
 
         # if SV is a deletion or duplication, genes must be same strand for fusion
-        if sv['sub_type'] == 'DEL' or sv['sub_type'] == 'DUP':
-            if gene1_strand != gene2_strand:
-                return
+        if sv['sub_type'] in ['DEL', 'DUP'] and gene1_strand != gene2_strand:
+            return
         # if SV is an inversion, genes must be opposite strands for fusion
-        if sv['sub_type'] == 'INV':
-            if gene1_strand == gene2_strand:
-                return
+        if sv['sub_type'] == 'INV' and gene1_strand == gene2_strand:
+            return
         # check COSMIC status, if required
-        if args.in_cosmic_census and not (sv['in_cosmic_census'] or gene2_cosmic):
+        if (
+            args.in_cosmic_census
+            and not sv['in_cosmic_census']
+            and not gene2_cosmic
+        ):
             return
 
         # pass the variables for compatibility with multi-line variants
@@ -69,7 +71,6 @@ def report_fusion(event, subjects_dict, args):
         end2_end = sv['sv_cipos_end_right']
 
 
-    # filter multi-line events
     elif len(event) == 2:
         end1 = event.pop()
         end2 = event.pop()
@@ -90,7 +91,11 @@ def report_fusion(event, subjects_dict, args):
                   and gene1_strand == gene2_strand):
             return
         # check COSMIC status, if required
-        if args.in_cosmic_census and not (end1['in_cosmic_census'] or end2['in_cosmic_census']):
+        if (
+            args.in_cosmic_census
+            and not end1['in_cosmic_census']
+            and not end2['in_cosmic_census']
+        ):
             return
 
         # store the second end for compatibility with single-line SVs
@@ -133,7 +138,7 @@ def get_fusions(args):
     # create strings for gemini query of command line args
     qual_string, ev_type_string, cosmic_string = ("", "", "")
     if args.min_qual:
-        qual_string = " AND qual >= %s" % args.min_qual
+        qual_string = f" AND qual >= {args.min_qual}"
     if args.evidence_type:
         ev_type_string = " AND sv_evidence_type = '%s'" % args.evidence_type
 

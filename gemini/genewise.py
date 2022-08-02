@@ -5,7 +5,6 @@ try:
     from compiler import compile
 except ImportError:
     basestring = str
-    pass
 import operator
 import itertools as it
 from argparse import ArgumentParser
@@ -34,7 +33,7 @@ def add_cols(cols, gt_filter):
                 "gt_ref_depths", "gt_alt_depths", "gt_quals",
                 "gt_phred_ll_homref", "gt_phred_ll_het",
                 "gt_phred_ll_homalt"]
-    return [x for x in all_cols if x in gt_filter and not x in cols]
+    return [x for x in all_cols if x in gt_filter and x not in cols]
 
 
 def gen_results(rows, gt_filters, gt_req_filters, min_filters, min_variants, columns,
@@ -50,7 +49,7 @@ def gen_results(rows, gt_filters, gt_req_filters, min_filters, min_variants, col
     subset = []
     for row in rows:
         cols = {c: row[c] for c in columns}
-        cols.update(user_dict)
+        cols |= user_dict
 
         row_passed_filters = []
         # check required filters first.
@@ -97,13 +96,13 @@ def genewise(db, gt_filters, gt_req_filters, filter=None, columns=None, min_filt
     if grouper not in orig_columns:
         added_cols.append(grouper)
     columns = orig_columns + added_cols
-    assert not any(';' in c for c in columns)
+    assert all(';' not in c for c in columns)
 
     # NOTE: we could make the WHERE part customizable.
     query = "SELECT {columns} FROM variants WHERE (%s)" % where
     if filter:
-        query += " AND  " + filter
-    query += (" ORDER BY CHROM, %s" % grouper)
+        query += f" AND  {filter}"
+    query += f" ORDER BY CHROM, {grouper}"
 
     gq = GeminiQuery(db, include_gt_cols=True)
 
@@ -122,12 +121,17 @@ def genewise(db, gt_filters, gt_req_filters, filter=None, columns=None, min_filt
         cleaned_reqs.append(compile(gt_filter, gt_filter, 'eval'))
 
 
-    if not "gt_types" in columns:
+    if "gt_types" not in columns:
         columns.append("gt_types")
         added_cols.append("gt_types")
 
     gq.run(query.format(columns=", ".join(columns)), needs_genotypes=True)
-    columns = [c for c in columns if not c in gq.gt_name_to_idx_map or (gq.gt_name_to_idx_map.get(c) == c)]
+    columns = [
+        c
+        for c in columns
+        if c not in gq.gt_name_to_idx_map or gq.gt_name_to_idx_map.get(c) == c
+    ]
+
 
     if isinstance(grouper, basestring):
         grouper = operator.itemgetter(grouper)

@@ -44,7 +44,7 @@ def add_requested_columns(args, update_cursor, col_names, col_types=None):
                              + col_name
                              + ")\" already exists in variants table. Overwriting values.\n")
             # reset values so that records don't retain old annotations.
-            update_cursor.execute("UPDATE variants SET " + col_name + " = NULL WHERE 1")
+            update_cursor.execute(f"UPDATE variants SET {col_name} = NULL WHERE 1")
 
     elif args.anno_type == "extract":
 
@@ -125,15 +125,16 @@ def _annotate_variants(args, conn, metadata, get_val_fn, col_names=None, col_typ
 
 def _update_variants(metadata, to_update, col_names, cursor):
     tbl = metadata.tables["variants"]
-    bound = {c: sql.bindparam("_" + c) for c in col_names}
+    bound = {c: sql.bindparam(f"_{c}") for c in col_names}
     stmt = tbl.update().where(tbl.c.variant_id == sql.bindparam("_variant_id"))
     stmt = stmt.values(**bound)
     def mkdict(v):
         d = {}
         d["_variant_id"] = v[-1]
         for i, val in enumerate(v[:-1]):
-            d["_" + col_names[i]] = val
+            d[f"_{col_names[i]}"] = val
         return d
+
     cursor.execute(stmt, [mkdict(v) for v in to_update])
 
 def annotate_variants_bool(args, conn, metadata, col_names):
@@ -168,9 +169,9 @@ def _map_list_types(hit_list, col_type):
     # TODO: handle missing because of VCF.
     try:
         if col_type in ("int", "integer"):
-            return [int(h) for h in hit_list if not h in (None, 'nan')]
+            return [int(h) for h in hit_list if h not in (None, 'nan')]
         elif col_type == "float":
-            return [float(h) for h in hit_list if not h in (None, 'nan')]
+            return [float(h) for h in hit_list if h not in (None, 'nan')]
     except ValueError:
         raise ValueError('Non-numeric value found in annotation file: %s\n' % (','.join(hit_list)))
 
@@ -206,14 +207,13 @@ def gemops_last(li, col_type):
     return li[-1]
 
 # lookup from the name to the func above.
-op_funcs = dict((k[7:], v) for k, v in locals().items() if k.startswith('gemops_'))
+op_funcs = {k[7:]: v for k, v in locals().items() if k.startswith('gemops_')}
 
 def fix_val(val, type):
-    if not type in ("int", "float"): return val
+    if type not in ("int", "float"): return val
     if isinstance(val, (int, float)): return val
 
-    if type == "int": fn = int
-    else: fn = float
+    fn = int if type == "int" else float
     if not val:
         return None
     try:
@@ -223,7 +223,7 @@ def fix_val(val, type):
 
 def get_hit_list(hits, col_idxs, args, _count={}):
     hits = list(hits)
-    if len(hits) == 0:
+    if not hits:
         return []
 
     hit_list = defaultdict(list)
@@ -232,17 +232,21 @@ def get_hit_list(hits, col_idxs, args, _count={}):
             hit = hit.split("\t")
         if args.anno_file.endswith(('.vcf', '.vcf.gz')):
             # only makes sens to extract when there is an equal sign
-            info = dict((x[0], x[1]) for x in (p.split('=') for p in hit[7].split(';') if '=' in p))
+            info = {
+                x[0]: x[1]
+                for x in (p.split('=') for p in hit[7].split(';') if '=' in p)
+            }
+
             for idx, col_idx in enumerate(col_idxs):
-                if not col_idx in info:
+                if col_idx not in info:
                     hit_list[idx].append('nan')
-                    if not col_idx in _count:
+                    if col_idx not in _count:
                         sys.stderr.write("WARNING: %s is missing from INFO field in %s for at "
                             "least one record.\n" % (col_idx, args.anno_file))
                         _count[col_idx] = True
                 else:
                     hit_list[idx].append(info[col_idx])
-                # just append None since in a VCFthey are likely # to be missing ?
+                            # just append None since in a VCFthey are likely # to be missing ?
 
 
         else:
@@ -250,9 +254,14 @@ def get_hit_list(hits, col_idxs, args, _count={}):
                 for idx, col_idx in enumerate(col_idxs):
                     hit_list[idx].append(hit[int(col_idx) - 1])
             except IndexError:
-                raise IndexError("Column " + args.col_extracts + " exceeds "
-                                 "the number of columns in your "
-                                 "annotation file.\n")
+                raise IndexError(
+                    (
+                        f"Column {args.col_extracts}" + " exceeds "
+                        "the number of columns in your "
+                        "annotation file.\n"
+                    )
+                )
+
     return hit_list
 
 def annotate_variants_extract(args, conn, metadata, col_names, col_types, col_ops, col_idxs):
@@ -271,7 +280,7 @@ def annotate_variants_extract(args, conn, metadata, col_names, col_types, col_op
                 val = op_funcs[op](hit_list[idx], col_types[idx])
             except ValueError:
                 val = None
-            if not 'list' in op:
+            if 'list' not in op:
                 vals.append(fix_val(val, col_types[idx]))
             else:
                 # already stringed it in list/uniq_list so don't check type
@@ -359,9 +368,8 @@ def annotate(parser, args):
         if args.col_extracts is None and not args.anno_file.endswith('.vcf.gz'):
             raise RuntimeError("You must specify which column to "
                                "extract from your annotation file.")
-        else:
-            col_names, col_types, col_ops, col_idxs = _validate_extract_args(args)
-            annotate_variants_extract(args, conn, metadata, col_names, col_types, col_ops, col_idxs)
+        col_names, col_types, col_ops, col_idxs = _validate_extract_args(args)
+        annotate_variants_extract(args, conn, metadata, col_names, col_types, col_ops, col_idxs)
     else:
         raise RuntimeError("Unknown column type requested. Exiting.")
 
@@ -370,8 +378,8 @@ def annotate(parser, args):
     # index on the newly created columns
     for col_name in col_names:
         with database_transaction(args.db) as c:
-            c.execute('''drop index if exists %s''' % (col_name + "idx"))
-            c.execute('''create index %s on variants(%s)''' % (col_name + "idx", col_name))
+            c.execute(f'''drop index if exists {col_name}idx''')
+            c.execute(f'''create index {col_name}idx on variants({col_name})''')
 
 
 def rm(path):

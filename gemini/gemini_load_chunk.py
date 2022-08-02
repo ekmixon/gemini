@@ -49,9 +49,7 @@ def get_phred_lik(gt_phred_likelihoods, dtype=np.int32, empty_val=-1):
             all_empty = False
         else:
             out.append(empty_line)
-    if all_empty:
-        return None
-    return np.array(out, dtype=dtype)
+    return None if all_empty else np.array(out, dtype=dtype)
 
 def get_extra_effects_fields(args):
     """Retrieve additional effects fields contained in the VCF.
@@ -71,8 +69,13 @@ def load_clinvar(cpath):
         gene = info.get('GENEINFO')
         if gene is None: continue
         #diseases = [x.decode('utf8', 'ignore').encode('ascii', 'ignore') for x in info.get('CLNDBN').split("|") if not x in (".", "not_specified", "not_provided")]
-        diseases = [x.encode('ascii', 'ignore').decode('ascii', 'ignore') for x in info.get('CLNDN', '.').split("|") if not x in (".", "not_specified", "not_provided")]
-        if diseases == []: continue
+        diseases = [
+            x.encode('ascii', 'ignore').decode('ascii', 'ignore')
+            for x in info.get('CLNDN', '.').split("|")
+            if x not in (".", "not_specified", "not_provided")
+        ]
+
+        if not diseases: continue
 
         genes = [x.split(":")[0] for x in gene.split("|")]
         for gene in genes:
@@ -86,8 +89,7 @@ def load_clinvar(cpath):
     return lookup
 
 def fix_col_name(s, patt=re.compile('-|\s|\\\\')):
-    if s in ('0', '-9'): return s
-    return patt.sub("_", s)
+    return s if s in ('0', '-9') else patt.sub("_", s)
 
 
 class GeminiLoader(object):
@@ -110,7 +112,12 @@ class GeminiLoader(object):
         if self.args.anno_type == "VEP":
             self._effect_fields = self._get_vep_csq(self.vcf_reader)
             # tuples of (db_column, CSQ name)
-            self._extra_effect_fields = [("vep_%s" % fix_col_name(x.lower()), x) for x in self._effect_fields if not x.lower() in expected]
+            self._extra_effect_fields = [
+                (f"vep_{fix_col_name(x.lower())}", x)
+                for x in self._effect_fields
+                if x.lower() not in expected
+            ]
+
         elif self.args.anno_type == "all":
             try:
                 self.vcf_reader["CSQ"]
@@ -119,7 +126,12 @@ class GeminiLoader(object):
             else:
                 self._effect_fields = self._get_vep_csq(self.vcf_reader)
                 # tuples of (db_column, CSQ name)
-                self._extra_effect_fields = [("vep_%s" % fix_col_name(x.lower()), x) for x in self._effect_fields if not x.lower() in expected]
+                self._extra_effect_fields = [
+                    (f"vep_{fix_col_name(x.lower())}", x)
+                    for x in self._effect_fields
+                    if x.lower() not in expected
+                ]
+
 
         else:
             self._effect_fields = []
@@ -129,7 +141,7 @@ class GeminiLoader(object):
             return
         self._create_db([x[0] for x in self._extra_effect_fields])
 
-        self._extra_empty = dict((x[0], None) for x in self._extra_effect_fields)
+        self._extra_empty = {x[0]: None for x in self._extra_effect_fields}
 
         if not self.args.no_genotypes and not self.args.no_load_genotypes:
             # load the sample info from the VCF file.
@@ -161,11 +173,7 @@ class GeminiLoader(object):
         database.insert_version(self.c, self.metadata, version.__version__.strip())
 
     def _get_vid(self):
-        if hasattr(self.args, 'offset'):
-            v_id = int(self.args.offset)
-        else:
-            v_id = 1
-        return v_id
+        return int(self.args.offset) if hasattr(self.args, 'offset') else 1
 
     def _multiple_alts_message(self):
         self.seen_multi = 1
@@ -199,16 +207,14 @@ class GeminiLoader(object):
                 anno_keys["EFF"] = parts
             else:
                 print("snpEff header not found")
-        if self.args.anno_type in ("VEP", "all"):
-            if "CSQ" in reader:
-                parts = [x.strip(" [])'(\"") for x in re.split("\||\(",
-                                                               reader["CSQ"]["Description"].split(":", 1)[1].strip())]
-                anno_keys["CSQ"] = parts
-        if self.args.anno_type in ("BCFT", "all"):
-            if "BCSQ" in reader:
-                desc = reader["BCSQ"]["Description"]
-                parts = desc.split(']', 1)[1].split(']')[0].replace('[','').split("|")
-                anno_keys['BCSQ'] = parts
+        if self.args.anno_type in ("VEP", "all") and "CSQ" in reader:
+            parts = [x.strip(" [])'(\"") for x in re.split("\||\(",
+                                                           reader["CSQ"]["Description"].split(":", 1)[1].strip())]
+            anno_keys["CSQ"] = parts
+        if self.args.anno_type in ("BCFT", "all") and "BCSQ" in reader:
+            desc = reader["BCSQ"]["Description"]
+            parts = desc.split(']', 1)[1].split(']')[0].replace('[','').split("|")
+            anno_keys['BCSQ'] = parts
 
         # process and load each variant in the VCF file
         for var in self.vcf_reader:
@@ -231,8 +237,13 @@ class GeminiLoader(object):
             if len(self.var_buffer) >= self.buffer_size:
                 database.insert_variation(self.c, self.metadata, self.var_buffer)
 
-                sys.stderr.write("pid " + str(os.getpid()) + ": " +
-                                 str(self.counter) + " variants processed.\n")
+                sys.stderr.write(
+                    (
+                        (f"pid {str(os.getpid())}" + ": " + str(self.counter))
+                        + " variants processed.\n"
+                    )
+                )
+
                 database.insert_variation_impacts(self.c, self.metadata,
                                                   self.var_impacts_buffer)
                 # binary.genotypes.append(var_buffer)
@@ -299,7 +310,7 @@ class GeminiLoader(object):
                 version_string = self.vcf_reader['SnpEffVersion']['SnpEffVersion']
             except KeyError:
                 error = ("\nWARNING: VCF is not annotated with snpEff, check documentation at:\n"\
-                "http://gemini.readthedocs.org/en/latest/content/functional_annotation.html#stepwise-installation-and-usage-of-snpeff\n")
+                    "http://gemini.readthedocs.org/en/latest/content/functional_annotation.html#stepwise-installation-and-usage-of-snpeff\n")
                 raise KeyError(error)
 
             # e.g., "SnpEff 3.0a (build 2012-07-08), by Pablo Cingolani"
@@ -308,10 +319,7 @@ class GeminiLoader(object):
             version_string = version_string.replace('"', '')  # No quotes
             toks = version_string.split()
 
-            if "SnpEff" in toks[0]:
-                self.args.raw_version = toks[1]  # SnpEff *version*, etc
-            else:
-                self.args.raw_version = toks[0]  # *version*, etc
+            self.args.raw_version = toks[1] if "SnpEff" in toks[0] else toks[0]
             # e.g., 3.0a -> 3
             self.args.maj_version = int(self.args.raw_version.split('.')[0])
         elif self.args.anno_type == "BCFT":
@@ -323,9 +331,6 @@ class GeminiLoader(object):
             except StopIteration:
                 pass
 
-        elif self.args.anno_type == "VEP":
-            pass
-
     def _get_vep_csq(self, reader):
         """
         Test whether the VCF header meets expectations for
@@ -334,11 +339,7 @@ class GeminiLoader(object):
         required = ["Consequence"]
         try:
             parts = reader["CSQ"]["Description"].strip().replace('"', '').split("Format: ")[-1].split("|")
-            all_found = True
-            for check in required:
-                if check not in parts:
-                    all_found = False
-                    break
+            all_found = all(check in parts for check in required)
             if all_found:
                 return parts
         except KeyError:
@@ -346,7 +347,7 @@ class GeminiLoader(object):
 
         # Should not reach this point, badly formatted VEP-VCF annotation
         error = "\nERROR: Check gemini docs for the recommended VCF annotation with VEP"\
-                "\nhttp://gemini.readthedocs.org/en/latest/content/functional_annotation.html#stepwise-installation-and-usage-of-vep"
+                    "\nhttp://gemini.readthedocs.org/en/latest/content/functional_annotation.html#stepwise-installation-and-usage-of-vep"
         raise ValueError(error)
 
     def _create_db(self, effect_fields=None):
@@ -355,7 +356,7 @@ class GeminiLoader(object):
         and create the gemini schema.
         """
         # open up a new database
-        db_path = self.args.db if not hasattr(self.args, 'tmp_db') else self.args.tmp_db
+        db_path = self.args.tmp_db if hasattr(self.args, 'tmp_db') else self.args.db
         if os.path.exists(db_path):
             os.remove(db_path)
         self.c, self.metadata = database.create_tables(db_path, effect_fields or [], not self.args.skip_pls)

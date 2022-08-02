@@ -59,15 +59,13 @@ def get_ind_lof(conn, metadata, args):
         #handle non exonic variants
         if transcript_pos is None:
             transcript_pct = '/'
-        #transcript_pct for snpEff annotated VCF
         elif aa_length != 'None' and "/" not in aa_length:
             transcript_pct = float(transcript_pos) / float(aa_length)
-        #transcript_pct for VEP annotated VCF
-        elif aa_length != 'None' and "/" in aa_length:
+        elif aa_length != 'None':
             transcript_pct = float(transcript_pos) / float(aa_length.split("/")[1])
 
         for idx, gt_type in enumerate(gt_types):
-            if gt_type == HET or gt_type == HOM_ALT:
+            if gt_type in [HET, HOM_ALT]:
                 print("\t".join([r['chrom'], str(r['start']),
                                  str(r['end']), r['ref'], r['alt'],
                                  r['impact'],

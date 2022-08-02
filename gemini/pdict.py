@@ -75,18 +75,17 @@ class PDict(object):
         if items is None:
             self._keys = []
             self._vals = []
+        elif isinstance(items, dict):
+            self._keys = items.keys()[:]
+            self._vals = items.values()[:]
+        elif isinstance(items, PDict):
+            self._keys = items._keys[:]
+            self._vals = items._vals[:]
+        elif hasattr(items, "__iter__"):
+            self._keys = [i[0] for i in items]
+            self._vals = [i[1] for i in items]
         else:
-            if isinstance(items, dict):
-                self._keys = items.keys()[:]
-                self._vals = items.values()[:]
-            elif isinstance(items, PDict):
-                self._keys = items._keys[:]
-                self._vals = items._vals[:]
-            elif hasattr(items, "__iter__"):
-                self._keys = [i[0] for i in items]
-                self._vals = [i[1] for i in items]
-            else:
-                raise NotImplemented
+            raise NotImplemented
 
     def __repr__(self):
         return "{%s}" % ", ".join("%r: %r" % p for p in zip(self._keys, self._vals))
@@ -127,19 +126,14 @@ class PDict(object):
             idx = self._keys.index(key)
         except ValueError:
             return None
-        if PY3:
-            return to_str(self._vals[idx])
-        return self._vals[idx]
+        return to_str(self._vals[idx]) if PY3 else self._vals[idx]
 
     def __getitem__(self, key):
         try:
             idx = self._keys.index(key)
         except ValueError:
             raise KeyError(key)
-        if PY3:
-            return to_str(self._vals[idx])
-        else:
-            return self._vals[idx]
+        return to_str(self._vals[idx]) if PY3 else self._vals[idx]
 
     def __setitem__(self, key, val):
         try:
@@ -160,8 +154,7 @@ class PDict(object):
         return self.__class__(self)
 
     def __iter__(self):
-        for k in self._keys:
-            yield k
+        yield from self._keys
 
     def __delitem__(self, key):
         idx = self._keys.index(key)

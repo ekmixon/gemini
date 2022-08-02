@@ -144,7 +144,13 @@ def mendelian_error(mother, father, child, pls=False):
     return 1.0 - p_not_error
 
 def xopen(f):
-    return gzip.open(f) if f.endswith(".gz") else sys.stdin if "-" == f else open(f)
+    return (
+        gzip.open(f)
+        if f.endswith(".gz")
+        else sys.stdin
+        if f == "-"
+        else open(f)
+    )
 
 def main(fh, father, mother, child):
 
@@ -172,7 +178,7 @@ def main(fh, father, mother, child):
         else:
             gli = fmt.index("GL")
             ogls = [s[gli].split(",") for s in samples]
-            gls = [[float(p) for g in gl] for gl in ogls]
+            gls = [[float(p) for _ in gl] for gl in ogls]
 
         for i, gl in enumerate(gls):
             while sum(gls[i]) < -50:

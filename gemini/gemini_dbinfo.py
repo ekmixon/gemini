@@ -8,7 +8,7 @@ def get_table_info(metadata, table_name, out_template):
     """
     Report the column names and types for a given database table
     """
-    if not table_name in metadata.tables:
+    if table_name not in metadata.tables:
         return
     tbl = metadata.tables[table_name]
     for row in tbl.columns:

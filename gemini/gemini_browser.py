@@ -47,8 +47,8 @@ def stats_region(chrom):
     # construct a query
     query =  "SELECT start, end from variants"
     query += " WHERE chrom = '" + chrom + "'"
-    query += " AND start >= " + start
-    query += " AND end <= " + end
+    query += f" AND start >= {start}"
+    query += f" AND end <= {end}"
 
     # issue the query
     gq = GeminiQuery.GeminiQuery(database)
@@ -128,7 +128,6 @@ def query():
                             gt_filter=gt_filter,
                             query=query)
 
-    # user clicked the "save to file" button
     elif request.GET.get('save', '').strip():
 
         (query, gt_filter, use_header, igv_links) = _get_fields()
@@ -143,15 +142,12 @@ def query():
         # stored in /static and a link will be given to
         # the user.
         tmp_file = '/tmp.txt'
-        tmp = open(_static_folder + tmp_file, 'w')
-        
-        for i, row in enumerate(gq):
-            if i == 0 and use_header:
-                tmp.write('\t'.join([str(key) for key in row.keys()]) + '\n')
-                
-            tmp.write('\t'.join([str(row[key]) for key in row.keys()]) + '\n')
+        with open(_static_folder + tmp_file, 'w') as tmp:
+            for i, row in enumerate(gq):
+                if i == 0 and use_header:
+                    tmp.write('\t'.join([str(key) for key in row.keys()]) + '\n')
 
-        tmp.close()
+                tmp.write('\t'.join([str(row[key]) for key in row.keys()]) + '\n')
 
         return template('query.j2', dbfile=database,
                         tmp_file=tmp_file,
@@ -160,7 +156,6 @@ def query():
                         use_header=use_header,
                         gt_filter=gt_filter,
                         query=query)
-    # user did nothing.
     else:
         return template('query.j2', dbfile=database)
 
@@ -180,18 +175,18 @@ class Arguments(object):
                  "pattern_only", "max_priority", # only for compound_het
                  "allow_unaffected", "min_gq", "lenient", "min_sample_depth")
     def __init__(self, **kwargs):
-        if not "min_gq" in kwargs: kwargs['min_gq'] = 0
-        if not "lenient" in kwargs: kwargs['lenient'] = False
+        if "min_gq" not in kwargs: kwargs['min_gq'] = 0
+        if "lenient" not in kwargs: kwargs['lenient'] = False
         for k in ("families", "filter"):
-            if not k in kwargs: kwargs[k] = None
-        if not "gt_phred_ll" in kwargs: kwargs['gt_phred_ll'] = None
-        if not "min_sample_depth" in kwargs: kwargs['min_sample_depth'] = 0
+            if k not in kwargs: kwargs[k] = None
+        if "gt_phred_ll" not in kwargs: kwargs['gt_phred_ll'] = None
+        if "min_sample_depth" not in kwargs: kwargs['min_sample_depth'] = 0
 
         for k in ("min_kindreds", "max_priority"):
-            if not k in kwargs: kwargs[k] = 1
+            if k not in kwargs: kwargs[k] = 1
         for k in ("pattern_only", "allow_unaffected"):
-            if not k in kwargs: kwargs[k] = False
-        if not "columns" in kwargs:
+            if k not in kwargs: kwargs[k] = False
+        if "columns" not in kwargs:
             kwargs['columns'] = ",".join(default_cols)
         self.__dict__.update(**kwargs)
 
@@ -199,51 +194,41 @@ class Arguments(object):
 @app.route('/de_novo', method='GET')
 def de_novo():
 
-    # user clicked the "submit" button
-    if request.GET.get('submit', '').strip():
-
-        min_sample_depth = str(request.GET.get('min-depth', '10').strip())
-        igv_links = request.GET.get('igv_links')
-
-        args = Arguments(db=database, min_sample_depth=min_sample_depth)
-
-        row_iter = DeNovo(args).report_candidates()
-
-        return template('de_novo.j2', dbfile=database,
-                        rows=row_iter,
-                        igv_links=igv_links)
-
-    else:
+    if not request.GET.get('submit', '').strip():
         return template('de_novo.j2', dbfile=database)
+    min_sample_depth = str(request.GET.get('min-depth', '10').strip())
+    igv_links = request.GET.get('igv_links')
+
+    args = Arguments(db=database, min_sample_depth=min_sample_depth)
+
+    row_iter = DeNovo(args).report_candidates()
+
+    return template('de_novo.j2', dbfile=database,
+                    rows=row_iter,
+                    igv_links=igv_links)
 
 
 @app.route('/auto_rec', method='GET')
 def auto_rec():
 
-    # user clicked the "submit" button
-    if request.GET.get('submit', '').strip():
-        min_sample_depth = str(request.GET.get('min-depth', '10').strip())
-        args = Arguments(db=database, min_sample_depth=min_sample_depth)
-
-        row_iter = AutoRec(args).report_candidates()
-        return template('auto_rec.j2', dbfile=database, rows=row_iter)
-
-    else:
+    if not request.GET.get('submit', '').strip():
         return template('auto_rec.j2', dbfile=database)
+    min_sample_depth = str(request.GET.get('min-depth', '10').strip())
+    args = Arguments(db=database, min_sample_depth=min_sample_depth)
+
+    row_iter = AutoRec(args).report_candidates()
+    return template('auto_rec.j2', dbfile=database, rows=row_iter)
 
 
 @app.route('/auto_dom', method='GET')
 def auto_dom():
 
-    # user clicked the "submit" button
-    if request.GET.get('submit', '').strip():
-        min_sample_depth = str(request.GET.get('min-depth', '10').strip())
-        args = Arguments(db=database, min_sample_depth=min_sample_depth)
-        row_iter = AutoDom(args).report_candidates()
-        return template('auto_dom.j2', dbfile=database, rows=row_iter)
-
-    else:
+    if not request.GET.get('submit', '').strip():
         return template('auto_dom.j2', dbfile=database)
+    min_sample_depth = str(request.GET.get('min-depth', '10').strip())
+    args = Arguments(db=database, min_sample_depth=min_sample_depth)
+    row_iter = AutoDom(args).report_candidates()
+    return template('auto_dom.j2', dbfile=database, rows=row_iter)
 
 
 @app.route('/db_schema', method='GET')
@@ -271,14 +256,14 @@ def browser_puzzle(args):
     BaseConfig.UPLOAD_DIR = os.path.join(root, 'resources')
 
     puzzle_srv = puzzle_app.create_app(config_obj=BaseConfig)
-    webbrowser.open_new_tab("http://{}:{}".format(host, port))
+    webbrowser.open_new_tab(f"http://{host}:{port}")
     run(puzzle_srv, host=host, port=port)
 
 def browser_builtin(args):
     host = args.host
     port = args.port
 
-    webbrowser.open_new_tab("http://{}:{}".format(host, port))
+    webbrowser.open_new_tab(f"http://{host}:{port}")
     run(app, host=host, port=port,
         reloader=True, debug=True)
 

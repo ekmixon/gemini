@@ -108,21 +108,15 @@ def merge_chunks(chunks, db, kwargs):
     return db
 
 def get_merge_chunks_cmd(chunks, db, tempdir=None, vcf=None, anno_type=None, skip_pls=False):
-    chunk_names = ""
-    for chunk in chunks:
-        chunk_names += " --chunkdb  " + chunk
-
+    chunk_names = "".join(f" --chunkdb  {chunk}" for chunk in chunks)
     tempdir_string, vcf_string, annotype_string = "", "", ""
-    skip_pls_string = ""
     if tempdir is not None:
-        tempdir_string = " --tempdir " + tempdir
+        tempdir_string = f" --tempdir {tempdir}"
     if vcf is not None:
-        vcf_string = " --vcf " + vcf
+        vcf_string = f" --vcf {vcf}"
     if anno_type is not None:
-        annotype_string = " -t " + anno_type
-    if skip_pls:
-        skip_pls_string = "--skip-pls"
-
+        annotype_string = f" -t {anno_type}"
+    skip_pls_string = "--skip-pls" if skip_pls else ""
     return ("gemini merge_chunks {chunk_names} {tempdir_string} "
             "{vcf_string} {annotype_string} {skip_pls_string} --db {db}").format(**locals())
 
@@ -173,68 +167,44 @@ def get_chunks_to_merge(chunks):
     sublist = list_to_sublists(chunks, 2)
     if len(sublist[-1]) > 1:
         return sublist
-    else:
-        sublist[-2].extend(sublist[-1])
-        return sublist[:-1]
+    sublist[-2].extend(sublist[-1])
+    return sublist[:-1]
 
 def list_to_sublists(l, n):
     """ convert list l to sublists of length n """
     return [l[i:i+n] for i in range(0, len(l), n)]
 
 def get_temp_dbs(n, tmp_dir):
-    return [os.path.join(tmp_dir, str(uuid.uuid4())) + ".db" for _ in range(n)]
+    return [f"{os.path.join(tmp_dir, str(uuid.uuid4()))}.db" for _ in range(n)]
 
 def get_chunk_name(chunk):
-    return "--chunkdb " + chunk
+    return f"--chunkdb {chunk}"
 
 def load_chunks_multicore(grabix_file, args):
     cores = args.cores
 
-    # specify the PED file if given one
-    ped_file = ""
-    if args.ped_file is not None:
-        ped_file = "-p " + args.ped_file
-
-    # specify the annotation type if given one
-    anno_type = ""
-    if args.anno_type is not None:
-        anno_type = "-t " + args.anno_type
-
+    ped_file = f"-p {args.ped_file}" if args.ped_file is not None else ""
+    anno_type = f"-t {args.anno_type}" if args.anno_type is not None else ""
     tempdir = ""
     if args.tempdir is not None:
         if not os.path.exists(args.tempdir):
             os.makedirs(args.tempdir)
-        tempdir = "--tempdir " + args.tempdir
-    chunk_dir = args.tempdir + "/" if args.tempdir else ""
+        tempdir = f"--tempdir {args.tempdir}"
+    chunk_dir = f"{args.tempdir}/" if args.tempdir else ""
 
-    no_genotypes = ""
-    if args.no_genotypes is True:
-        no_genotypes = "--no-genotypes"
-
+    no_genotypes = "--no-genotypes" if args.no_genotypes is True else ""
     no_load_genotypes = ""
     if args.no_load_genotypes is True:
         no_load_genotypes = "--no-load-genotypes"
 
-    skip_gerp_bp = ""
-    if args.skip_gerp_bp is True:
-        skip_gerp_bp = "--skip-gerp-bp"
-
+    skip_gerp_bp = "--skip-gerp-bp" if args.skip_gerp_bp is True else ""
     skip_gene_tables = ""
     if args.skip_gene_tables is True:
         skip_gene_tables = "--skip-gene-tables"
 
-    skip_cadd = ""
-    if args.skip_cadd is True:
-        skip_cadd = "--skip-cadd"
-
-    test_mode = ""
-    if args.test_mode is True:
-        test_mode = "--test-mode"
-
-    passonly = ""
-    if args.passonly is True:
-        passonly = "--passonly"
-
+    skip_cadd = "--skip-cadd" if args.skip_cadd is True else ""
+    test_mode = "--test-mode" if args.test_mode is True else ""
+    passonly = "--passonly" if args.passonly is True else ""
     skip_pls = "--skip-pls" if args.skip_pls else ""
 
     skip_info_string = ""
@@ -250,7 +220,7 @@ def load_chunks_multicore(grabix_file, args):
 
     for chunk_num, chunk in chunk_steps:
         start, stop = chunk
-        print("Loading chunk " + str(chunk_num) + ".")
+        print(f"Loading chunk {str(chunk_num)}.")
         gemini_load = gemini_pipe_load_cmd().format(**locals())
         if os.environ.get('GEMINI_DEBUG') == "TRUE":
             sys.stderr.write(gemini_load + "\n")
@@ -259,58 +229,35 @@ def load_chunks_multicore(grabix_file, args):
 
         chunk_vcf = chunk_dir + vcf + ".chunk" + str(chunk_num)
         chunk_vcfs.append(chunk_vcf)
-        chunk_dbs.append(chunk_vcf + ".db")
+        chunk_dbs.append(f"{chunk_vcf}.db")
 
     wait_until_finished(procs)
     print("Done loading {0} variants in {1} chunks.".format(stop, chunk_num+1))
     return chunk_dbs
 
 def load_chunks_ipython(grabix_file, args, view):
-    # specify the PED file if given one
-    ped_file = ""
-    if args.ped_file is not None:
-        ped_file = "-p " + args.ped_file
-
-    # specify the annotation type if given one
-    anno_type = ""
-    if args.anno_type is not None:
-        anno_type = "-t " + args.anno_type
-
+    ped_file = f"-p {args.ped_file}" if args.ped_file is not None else ""
+    anno_type = f"-t {args.anno_type}" if args.anno_type is not None else ""
     tempdir = ""
     if args.tempdir is not None:
         if not os.path.exists(args.tempdir):
             os.makedirs(args.tempdir)
-        tempdir = "--tempdir " + args.tempdir
-    chunk_dir = args.tempdir + "/" if args.tempdir else ""
+        tempdir = f"--tempdir {args.tempdir}"
+    chunk_dir = f"{args.tempdir}/" if args.tempdir else ""
 
-    no_genotypes = ""
-    if args.no_genotypes is True:
-        no_genotypes = "--no-genotypes"
-
+    no_genotypes = "--no-genotypes" if args.no_genotypes is True else ""
     no_load_genotypes = ""
     if args.no_load_genotypes is True:
         no_load_genotypes = "--no-load-genotypes"
 
-    skip_gerp_bp = ""
-    if args.skip_gerp_bp is True:
-        skip_gerp_bp = "--skip-gerp-bp"
-
+    skip_gerp_bp = "--skip-gerp-bp" if args.skip_gerp_bp is True else ""
     skip_gene_tables = ""
     if args.skip_gene_tables is True:
         skip_gene_tables = "--skip-gene-tables"
 
-    skip_cadd = ""
-    if args.skip_cadd is True:
-        skip_cadd = "--skip-cadd"
-
-    test_mode = ""
-    if args.test_mode is True:
-        test_mode = "--test-mode"
-
-    passonly = ""
-    if args.passonly is True:
-        passonly = "--passonly"
-
+    skip_cadd = "--skip-cadd" if args.skip_cadd is True else ""
+    test_mode = "--test-mode" if args.test_mode is True else ""
+    passonly = "--passonly" if args.passonly is True else ""
     skip_info_string = ""
     if args.skip_info_string is True:
         skip_info_string = "--skip-info-string"
@@ -348,14 +295,19 @@ def load_chunk(chunk_step, kwargs):
     args["vcf"] = os.path.abspath(args["vcf"])
     gemini_load = gemini_pipe_load_cmd().format(**args)
     subprocess.check_call(gemini_load, shell=True)
-    chunk_db = kwargs["chunk_dir"] + os.path.basename(args["vcf"]) + ".chunk" + str(chunk_num) + ".db"
-    return chunk_db
+    return (
+        kwargs["chunk_dir"]
+        + os.path.basename(args["vcf"])
+        + ".chunk"
+        + str(chunk_num)
+        + ".db"
+    )
 
 def wait_until_finished(procs):
     """Wait for parts to finish and ensure a clean finish for each.
     """
     pids = [p.wait() for p in procs]
-    if len([p for p in pids if p != 0]) > 0:
+    if [p for p in pids if p != 0]:
         raise ValueError("Processing failed on GEMINI chunk load")
 
 def cleanup_temp_db_files(chunk_dbs):
@@ -401,7 +353,7 @@ def get_num_lines(index_file):
 def grabix_index(fname):
     if not which("grabix"):
         print_cmd_not_found_and_exit("grabix")
-    index_file = fname + ".gbi"
+    index_file = f"{fname}.gbi"
     if file_exists(index_file) and os.path.getmtime(index_file) > os.path.getmtime(fname):
         return index_file
     print("Indexing {0} with grabix.".format(fname))
@@ -417,26 +369,28 @@ def bgzip(fname):
         return fname
 
     vcf_time = os.path.getmtime(fname)
-    bgzip_file = fname + ".gz"
+    bgzip_file = f"{fname}.gz"
 
     if not file_exists(bgzip_file) or \
        (file_exists(bgzip_file) and os.path.getmtime(bgzip_file) < vcf_time):
-        print("Bgzipping {0} into {1}.".format(fname, fname + ".gz"))
+        print("Bgzipping {0} into {1}.".format(fname, f"{fname}.gz"))
         subprocess.check_call("bgzip -c {fname} > \
                               {fname}.gz".format(fname=fname),
                               shell=True)
     elif file_exists(bgzip_file) and os.path.getmtime(bgzip_file) > vcf_time:
-        print("Loading with existing bgzip ({0}) version of {1}.".format(fname + ".gz", fname))
+        print(
+            "Loading with existing bgzip ({0}) version of {1}.".format(
+                f"{fname}.gz", fname
+            )
+        )
+
 
     return bgzip_file
 
 
 def is_gz_file(fname):
     _, ext = os.path.splitext(fname)
-    if ext == ".gz":
-        return True
-    else:
-        return False
+    return ext == ".gz"
 
 def get_submit_command(args):
     return "{cmd}"

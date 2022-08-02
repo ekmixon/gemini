@@ -45,11 +45,10 @@ def get_n_variants(cur):
     return next(iter(cur.execute(sql.text("select count(*) from variants"))))[0]
 
 def get_bcolz_dir(db):
-    if not "://" in db:
-        return db + ".gts"
-    else:
-        base = os.environ.get("gemini_bcolz_path", os.path.expand("~/.bcolz/"))
-        return os.path.join(base, db.split("/")[-1])
+    if "://" not in db:
+        return f"{db}.gts"
+    base = os.environ.get("gemini_bcolz_path", os.path.expand("~/.bcolz/"))
+    return os.path.join(base, db.split("/")[-1])
 
 gt_cols_types = (
     ('gts', np.object),
@@ -103,12 +102,17 @@ def create(db, cols=None):
 
             dt = dict(gt_cols_types)[gtc]
             for s in samples:
-                mkdir("%s/%s" % (bcpath, s))
-                carrays[gtc].append(bcolz.carray(np.empty(0, dtype=dt),
-                                    expectedlen=nv,
-                                    rootdir="%s/%s/%s" % (bcpath, s, gtc),
-                                    chunklen=16384*8,
-                                    mode="w"))
+                mkdir(f"{bcpath}/{s}")
+                carrays[gtc].append(
+                    bcolz.carray(
+                        np.empty(0, dtype=dt),
+                        expectedlen=nv,
+                        rootdir=f"{bcpath}/{s}/{gtc}",
+                        chunklen=16384 * 8,
+                        mode="w",
+                    )
+                )
+
                 tmps[gtc].append([])
 
         t0 = time.time()
@@ -119,7 +123,7 @@ def create(db, cols=None):
         decomp = compression.unpack_genotype_blob
 
         empty = [-1] * len(samples)
-        for i, row in enumerate(conn.execute(sql.text("select %s from variants" % ", ".join(gt_cols)))):
+        for i, row in enumerate(conn.execute(sql.text(f'select {", ".join(gt_cols)} from variants'))):
             if i == 0:
                 try:
                     decomp(row[0])
@@ -173,14 +177,14 @@ def load(db, query=None):
     carrays = {}
     n = 0
     for gtc in gt_cols:
-        if not gtc in query: continue
+        if gtc not in query: continue
         carrays[gtc] = []
         for s in samples:
-            if not s in query and not fix_sample_name(s) in query:
+            if s not in query and fix_sample_name(s) not in query:
                 # need to add anyway as place-holder
                 carrays[gtc].append(None)
                 continue
-            path = "%s/%s/%s" % (bcpath, s, gtc)
+            path = f"{bcpath}/{s}/{gtc}"
             if os.path.exists(path):
                 carrays[gtc].append(bcolz.open(path, mode="r"))
                 n += 1
@@ -204,16 +208,16 @@ def filter(db, query, user_dict):
 
     if query.startswith("not "):
         # "~" is not to numexpr.
-        query = "~" + query[4:]
+        query = f"~{query[4:]}"
     sum_cmp = False
     if query.startswith("sum("):
         assert query[-1].isdigit()
         query, sum_cmp = query[4:].rsplit(")", 1)
-        query = "(%s) %s" % (query, sum_cmp)
+        query = f"({query}) {sum_cmp}"
 
     query = query.replace(".", "__")
-    query = " & ".join("(%s)" % token for token in query.split(" and "))
-    query = " | ".join("(%s)" % token for token in query.split(" or "))
+    query = " & ".join(f"({token})" for token in query.split(" and "))
+    query = " | ".join(f"({token})" for token in query.split(" or "))
 
     conn, metadata = database.get_session_metadata(db)
     samples = get_samples(metadata)
@@ -224,7 +228,7 @@ def filter(db, query, user_dict):
     def subfn(x):
         """Turn gt_types[1] into gt_types__sample"""
         field, idx = x.groups()
-        return "%s__%s" % (field, fix_sample_name(samples[int(idx)]))
+        return f"{field}__{fix_sample_name(samples[int(idx)])}"
 
     query = re.sub(patt, subfn, query)
     if os.environ.get('GEMINI_DEBUG') == 'TRUE':
@@ -238,11 +242,11 @@ def filter(db, query, user_dict):
 
     # loop through and create a cache of "$gt__$sample"
     for gt_col in carrays:
-        if not gt_col in query: continue
+        if gt_col not in query: continue
         for i, sample_array in enumerate(carrays[gt_col]):
             sample = fix_sample_name(samples[i])
-            if not sample in query: continue
-            user_dict["%s__%s" % (gt_col, sample)] = sample_array
+            if sample not in query: continue
+            user_dict[f"{gt_col}__{sample}"] = sample_array
 
     # had to special-case count. it won't quite be as efficient
     if "|count|" in query:
@@ -252,7 +256,7 @@ def filter(db, query, user_dict):
         res = [bcolz.eval(tok, user_dict=user_dict) for tok in tokens[:-1]]
         # in memory after this, but just a single axis array.
         res = np.sum(res, axis=0)
-        res = ne.evaluate('res%s' % icmp)
+        res = ne.evaluate(f'res{icmp}')
     else:
         res = bcolz.eval(query, user_dict=user_dict)
 
@@ -265,10 +269,7 @@ def filter(db, query, user_dict):
     #variant_ids = np.array(list(bcolz.eval(query, user_dict=user_dict,
     #    vm="numexpr").wheretrue()))
     # variant ids are 1-based.
-    if len(variant_ids) > 0:
-        return 1 + variant_ids
-    else:
-        return []
+    return 1 + variant_ids if len(variant_ids) > 0 else []
 
 if __name__ == "__main__":
 

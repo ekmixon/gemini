@@ -69,11 +69,21 @@ def check_sex(args):
         raise ValueError("Cannot find variant offsets for chrom %s\n" % args.chrom)
 
     bcpath = bc.get_bcolz_dir(args.db)
-    print('\t'.join(['sample', 'sex',
-        args.chrom + '_homref', args.chrom + '_het',
-        args.chrom + '_homalt', 'het_homref_ratio']))
+    print(
+        '\t'.join(
+            [
+                'sample',
+                'sex',
+                f'{args.chrom}_homref',
+                f'{args.chrom}_het',
+                f'{args.chrom}_homalt',
+                'het_homref_ratio',
+            ]
+        )
+    )
+
     for sample in sample_sex:
-        path = "%s/%s/%s" % (bcpath, sample, 'gt_types')
+        path = f"{bcpath}/{sample}/gt_types"
         if os.path.exists(path):
             gt_types_carray = bc.bcolz.open(path, mode="r")
         else:
@@ -92,6 +102,5 @@ def check_sex(args):
             het_homref_ratio]))
 
 def run(parser, args):
-    if os.path.exists(args.db):
-        if args.mode == "sex":
-            check_sex(args)
+    if os.path.exists(args.db) and args.mode == "sex":
+        check_sex(args)

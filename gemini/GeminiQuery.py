@@ -8,8 +8,6 @@ try:
     from compiler import compile
 except ImportError:
     unicode = str
-    pass
-
 PY3 = sys.version_info[0] ==  3
 
 import collections
@@ -109,13 +107,18 @@ class CarrierSummary(RowFormat):
 
         # get the list of all possible values in the column
         # but don't include None, since we are treating that as unknown.
-        self.column_types = list(set([getattr(x, self.carrier_summary)
-                                      for x in subjects.values()]))
+        self.column_types = list(
+            {getattr(x, self.carrier_summary) for x in subjects.values()}
+        )
+
         self.column_types = [i for i in self.column_types if i is not None]
         self.column_counters = {None: set()}
         for ct in self.column_types:
-            self.column_counters[ct] = set([k for (k, v) in subjects.items() if
-                                            getattr(v, self.carrier_summary) == ct])
+            self.column_counters[ct] = {
+                k
+                for (k, v) in subjects.items()
+                if getattr(v, self.carrier_summary) == ct
+            }
 
 
     def format(self, row):
@@ -133,9 +136,15 @@ class CarrierSummary(RowFormat):
         carrier_counts.append(unknown)
         carrier_counts = map(str, carrier_counts)
         r = row.print_fields
-        return '\t'.join(str(r[c]) if not isinstance(r[c], np.ndarray) else
-                         ",".join(str(s) for s in r[c]) for c in r) \
-               + "\t" + "\t".join(carrier_counts)
+        return (
+            '\t'.join(
+                ",".join(str(s) for s in r[c])
+                if isinstance(r[c], np.ndarray)
+                else str(r[c])
+                for c in r
+            )
+            + "\t"
+        ) + "\t".join(carrier_counts)
 
     def format_query(self, query):
         return query
@@ -148,8 +157,8 @@ class CarrierSummary(RowFormat):
         header_columns = self.column_types
         if self.carrier_summary == "affected":
             header_columns = self._rename_affected()
-        carriers = [x + "_carrier" for x in map(str, header_columns)]
-        noncarriers = [x + "_noncarrier" for x in map(str, header_columns)]
+        carriers = [f"{x}_carrier" for x in map(str, header_columns)]
+        noncarriers = [f"{x}_noncarrier" for x in map(str, header_columns)]
         fields += carriers
         fields += noncarriers
         fields += ["unknown"]
@@ -216,7 +225,7 @@ class TPEDRowFormat(RowFormat):
         return len(genotype) < 2
 
     def _has_missing(self, genotype):
-        return any([allele in self.NULL_GENOTYPES for allele in genotype])
+        return any(allele in self.NULL_GENOTYPES for allele in genotype)
 
     def _is_heterozygote(self, genotype):
         return len(genotype) == 2 and (genotype[0] != genotype[1])
@@ -320,21 +329,21 @@ class VCFRowFormat(RowFormat):
         gt_types = list(row['gt_types'])
         gt_phases = list(row['gt_phases'])
         for idx, gt_type in enumerate(gt_types):
-            phase_char = '/' if not gt_phases[idx] else '|'
+            phase_char = '|' if gt_phases[idx] else '/'
             gt = gts[idx]
             alleles = gt.split(phase_char)
             if gt_type == HOM_REF:
-                vcf_rec.append('0' + phase_char + '0')
+                vcf_rec.append(f'0{phase_char}0')
             elif gt_type == HET:
                 # if the genotype is phased, need to check for 1|0 vs. 0|1
                 if gt_phases[idx] and alleles[0] != row.row['ref']:
-                    vcf_rec.append('1' + phase_char + '0')
+                    vcf_rec.append(f'1{phase_char}0')
                 else:
-                    vcf_rec.append('0' + phase_char + '1')
+                    vcf_rec.append(f'0{phase_char}1')
             elif gt_type == HOM_ALT:
-                vcf_rec.append('1' + phase_char + '1')
+                vcf_rec.append(f'1{phase_char}1')
             elif gt_type == UNKNOWN:
-                vcf_rec.append('.' + phase_char + '.')
+                vcf_rec.append(f'.{phase_char}.')
 
         return '\t'.join([str(c) if c is not None else "." for c in vcf_rec])
 
@@ -377,9 +386,11 @@ class SampleDetailRowFormat(RowFormat):
         samples = [s for s in r["variant_samples"].split(self.args.sample_delim) if s]
         for x in self.gq.sample_show_fields:
             del r[x]
-        out = []
-        for sample in samples:
-            out.append('\t'.join([str(r[c]) for c in r] + self.samples[sample]))
+        out = [
+            '\t'.join([str(r[c]) for c in r] + self.samples[sample])
+            for sample in samples
+        ]
+
         return "\n".join(out)
 
     def format_query(self, query):
@@ -420,8 +431,13 @@ class GeminiRow(object):
     def __getitem__(self, key):
         # we cache what we can.
         key = str(key)
-        if key in ('het_samples', 'hom_alt_samples', 'unknown_samples',
-                'variant_samples', 'hom_ref_samples'):
+        if key in {
+            'het_samples',
+            'hom_alt_samples',
+            'unknown_samples',
+            'variant_samples',
+            'hom_ref_samples',
+        }:
             if self.genotype_dict == {}:
                 self.genotype_dict = self.query._group_samples_by_genotype(self['gt_types'])
             if key == 'het_samples':
@@ -444,13 +460,11 @@ class GeminiRow(object):
             return self.cache['info']
         if key not in self.query.gt_cols:
             return self.row[key]
-        elif key in self.query.gt_cols:
-            if key not in self.cache:
-                self.cache[key] = self.unpack(self.row[key])
-                if PY3 and key == 'gts':
-                    self.cache[key] = self.cache[key].astype(str)
-            return self.cache[key]
-        raise KeyError(key)
+        if key not in self.cache:
+            self.cache[key] = self.unpack(self.row[key])
+            if PY3 and key == 'gts':
+                self.cache[key] = self.cache[key].astype(str)
+        return self.cache[key]
 
     def keys(self):
         return self.row.keys() + list(self.cache.keys())
@@ -600,10 +614,7 @@ class GeminiQuery(object):
         self.variant_samples_delim = variant_samples_delim
 
         self.needs_genotypes = needs_genotypes
-        self.needs_vcf_columns = False
-        if self.formatter.name == 'vcf':
-            self.needs_vcf_columns = True
-
+        self.needs_vcf_columns = self.formatter.name == 'vcf'
         self.needs_genes = needs_genes
         self.show_families = show_families
         self.subjects = subjects
@@ -614,38 +625,36 @@ class GeminiQuery(object):
         # comma and a space. then tokenize by spaces.
         self.query = self.query.replace(',', ', ')
         self.query_pieces = self.query.split()
-        if not any(s.startswith(("gt", "(gt")) for s in self.query_pieces) and \
-           not any(".gt" in s for s in self.query_pieces):
+        if not any(s.startswith(("gt", "(gt")) for s in self.query_pieces) and all(
+            ".gt" not in s for s in self.query_pieces
+        ):
             if self.gt_filter is None:
                 self.query_type = "no-genotypes"
             else:
                 self.gt_filter = self._correct_genotype_filter()
                 self.query_type = "filter-genotypes"
+        elif self.gt_filter is None:
+            self.query_type = "select-genotypes"
         else:
-            if self.gt_filter is None:
-                self.query_type = "select-genotypes"
+            self.gt_filter = self._correct_genotype_filter()
+            self.query_type = "filter-genotypes"
+
+        if self.gt_filter and self.variant_id_getter:
+            if os.environ.get('GEMINI_DEBUG') == 'TRUE':
+                sys.stderr.write("bcolz: using index\n")
+
+            user_dict = dict(HOM_REF=0, HET=1, UNKNOWN=2, HOM_ALT=3,
+                             sample_info=self.sample_info,
+                             MISSING=None, UNAFFECTED=1, AFFECTED=2)
+            import time
+            t0 = time.time()
+            vids = self.variant_id_getter(self.db, self.gt_filter, user_dict)
+            if vids is None:
+                sys.stderr.write("bcolz: can't parse this filter (falling back to gemini): %s\n" % self.gt_filter)
             else:
-                self.gt_filter = self._correct_genotype_filter()
-                self.query_type = "filter-genotypes"
-
-        if self.gt_filter:
-            # here's how we use the fast
-            if self.variant_id_getter:
                 if os.environ.get('GEMINI_DEBUG') == 'TRUE':
-                    sys.stderr.write("bcolz: using index\n")
-
-                user_dict = dict(HOM_REF=0, HET=1, UNKNOWN=2, HOM_ALT=3,
-                                 sample_info=self.sample_info,
-                                 MISSING=None, UNAFFECTED=1, AFFECTED=2)
-                import time
-                t0 = time.time()
-                vids = self.variant_id_getter(self.db, self.gt_filter, user_dict)
-                if vids is None:
-                    sys.stderr.write("bcolz: can't parse this filter (falling back to gemini): %s\n" % self.gt_filter)
-                else:
-                    if os.environ.get('GEMINI_DEBUG') == 'TRUE':
-                        sys.stderr.write("bcolz: %.2f seconds to get %d rows.\n" % (time.time() - t0, len(vids)))
-                    self.add_vids_to_query(vids)
+                    sys.stderr.write("bcolz: %.2f seconds to get %d rows.\n" % (time.time() - t0, len(vids)))
+                self.add_vids_to_query(vids)
 
         if self.gt_filter:
             self.gt_filter_compiled = compile(self.gt_filter, self.gt_filter, 'eval')
@@ -658,11 +667,7 @@ class GeminiQuery(object):
         return self
 
     def add_vids_to_query(self, vids):
-        #extra = " variant_id IN (%s)" % ",".join(map(str, vids))
-        # faster way to convert to string.
-        # http://stackoverflow.com/a/13861407
-        q = add_variant_ids_to_query(self.query, vids)
-        if q:
+        if q := add_variant_ids_to_query(self.query, vids):
             self.query = q
             self.gt_filter = None
 
@@ -673,11 +678,12 @@ class GeminiQuery(object):
         were selected in the query issued to a GeminiQuery object.
         """
         if self.query_type == "no-genotypes":
-            h = [col for col in self.all_query_cols]
+            h = list(self.all_query_cols)
         else:
-            h = [col for col in self.all_query_cols] + \
-                [col for col in OrderedSet(self.all_columns_orig)
-                 - OrderedSet(self.select_columns)]
+            h = list(self.all_query_cols) + list(
+                OrderedSet(self.all_columns_orig) - OrderedSet(self.select_columns)
+            )
+
         if self.show_variant_samples:
             h += self.sample_show_fields
         if self.show_families:
@@ -721,7 +727,7 @@ class GeminiQuery(object):
         # throw a continue and keep trying. the alternative is to just
         # recursively call next(self) if we need to skip, but this
         # can quickly exceed the stack.
-        while (1):
+        while 1:
             try:
                 row = GeminiRow(next(self.result_proxy), self,
                         unpacker=self.unpacker)
@@ -733,7 +739,7 @@ class GeminiQuery(object):
             # short circuit some expensive ops
             if self.gt_filter:
                 try:
-                    if 'False' == self.gt_filter: continue
+                    if self.gt_filter == 'False': continue
                     unpacked = {'sample_info': self.sample_info, 'HET': HET,
                             'HOM_REF': HOM_REF, 'HOM_ALT': HOM_ALT}
                     for col in self.gt_cols:
@@ -742,7 +748,6 @@ class GeminiQuery(object):
 
                     if not eval(self.gt_filter_compiled, unpacked):
                         continue
-                # eval on a phred_ll column that was None
                 except TypeError:
                     continue
 
@@ -751,60 +756,66 @@ class GeminiQuery(object):
             for idx, col in enumerate(self.report_cols):
                 if col == "*":
                     continue
-                if not col[:2] in ("gt", "GT"):
+                if col[:2] not in ("gt", "GT"):
                     # need to use add in case of duplicated fields (from
                     # variants and variant_impacts)
                     fields.add(col, row[col])
-                else:
-                    # reuse the original column name user requested
-                    # e.g. replace gts[1085] with gts.NA20814
-                    if '[' in col:
-                        orig_col = self.gt_idx_to_name_map[col]
+                elif '[' in col:
+                    orig_col = self.gt_idx_to_name_map[col]
 
-                        source, extra = col.split('[', 1)
-                        assert extra[-1] == ']'
-                        if source.startswith('gt_phred_ll') and row[source] is None:
-                            fields[orig_col] = None
-                            continue
+                    source, extra = col.split('[', 1)
+                    assert extra[-1] == ']'
+                    if source.startswith('gt_phred_ll') and row[source] is None:
+                        fields[orig_col] = None
+                        continue
 
-                        idx = int(extra[:-1])
-                        val = row[source][idx]
+                    idx = int(extra[:-1])
+                    val = row[source][idx]
 
-                        if type(val) in (np.int8, np.int32, np.bool_):
-                            fields.add(orig_col, int(val))
+                    if type(val) in (np.int8, np.int32, np.bool_):
+                        fields.add(orig_col, int(val))
 
-                        elif type(val) in (np.float32,):
-                            fields.add(orig_col, float(val))
-                        else:
-                            fields.add(orig_col, val)
+                    elif type(val) in (np.float32,):
+                        fields.add(orig_col, float(val))
                     else:
+                        fields.add(orig_col, val)
+                else:
                         # asked for "gts" or "gt_types", e.g.
-                        if row[col] is not None:
-                            fields[col] = row[col]
-                        else:
-                            fields[col] = str(None)
-
+                    fields[col] = row[col] if row[col] is not None else str(None)
             if self.show_variant_samples:
                 fields["variant_samples"] = \
-                    self.variant_samples_delim.join(self._filter_samples(row['variant_samples']))
+                        self.variant_samples_delim.join(self._filter_samples(row['variant_samples']))
                 fields["het_samples"] = \
-                    self.variant_samples_delim.join(self._filter_samples(row['het_samples']))
+                        self.variant_samples_delim.join(self._filter_samples(row['het_samples']))
                 fields["hom_alt_samples"] = \
-                    self.variant_samples_delim.join(self._filter_samples(row['hom_alt_samples']))
+                        self.variant_samples_delim.join(self._filter_samples(row['hom_alt_samples']))
             if self.show_families:
-                families = map(str, list(set([self.sample_to_sample_object[x].family_id
-                                              for x in row['variant_samples']])))
+                families = map(
+                    str,
+                    list(
+                        {
+                            self.sample_to_sample_object[x].family_id
+                            for x in row['variant_samples']
+                        }
+                    ),
+                )
+
                 fields["families"] = self.variant_samples_delim.join(families)
 
             if not all(predicate(row) for predicate in self.predicates):
                 continue
 
-            if not self.for_browser:
-                # need to use new row for formatter.
-                return GeminiRow(row, self, formatter=self.formatter,
-                        print_fields=fields, unpacker=self.unpacker)
-            else:
-                return fields
+            return (
+                fields
+                if self.for_browser
+                else GeminiRow(
+                    row,
+                    self,
+                    formatter=self.formatter,
+                    print_fields=fields,
+                    unpacker=self.unpacker,
+                )
+            )
     __next__ = next
 
     def _filter_samples(self, samples):
@@ -867,12 +878,8 @@ class GeminiQuery(object):
             return False
 
         # make sure a "gt" col is in the string
-        valid_cols = list(flatten(("%s." % gtc, "(%s)." % gtc) for gtc in self.gt_cols))
-        if any(s in gt_filter for s in valid_cols):
-            return True
-
-        # assume the worst
-        return False
+        valid_cols = list(flatten((f"{gtc}.", f"({gtc}).") for gtc in self.gt_cols))
+        return any((s in gt_filter for s in valid_cols))
 
     def _execute_query(self):
         try:
@@ -881,7 +888,7 @@ class GeminiQuery(object):
             msg = "SQL error: {0}\n".format(e)
             print(msg)
             sys.stderr.write(msg)
-            raise ValueError("The query issued (%s) has a syntax error." % self.query)
+            raise ValueError(f"The query issued ({self.query}) has a syntax error.")
         return res
 
     def _apply_query(self):
@@ -907,9 +914,11 @@ class GeminiQuery(object):
             res = self._execute_query()
 
             self.all_query_cols = [
-                str(tuple[0]) for tuple in res.cursor.description
-                if not tuple[0][:2] == "gt" and ".gt" not in tuple[0]
-                ]
+                str(tuple[0])
+                for tuple in res.cursor.description
+                if tuple[0][:2] != "gt" and ".gt" not in tuple[0]
+            ]
+
 
             if "*" in self.select_columns:
                 self.select_columns.remove("*")
@@ -918,13 +927,15 @@ class GeminiQuery(object):
                 self.select_columns += self.all_query_cols
 
             self.report_cols = self.all_query_cols + \
-                list(OrderedSet(self.all_columns_new) - OrderedSet(self.select_columns))
-        # the query does not involve the variants table
-        # and as such, we don't need to do anything fancy.
+                    list(OrderedSet(self.all_columns_new) - OrderedSet(self.select_columns))
         else:
             res = self._execute_query()
-            self.all_query_cols = [str(tuple[0]) for tuple in res.cursor.description
-                    if not tuple[0][:2] == "gt"]
+            self.all_query_cols = [
+                str(tuple[0])
+                for tuple in res.cursor.description
+                if tuple[0][:2] != "gt"
+            ]
+
             self.report_cols = self.all_query_cols
 
         return res
@@ -963,11 +974,7 @@ class GeminiQuery(object):
         if wildcard.strip() != "*":
             q = q.where(sql.text(wildcard))
 
-        sample_info = [] # list of sample_id/name tuples
-        for row in q.execute():
-            # sample_ids are 1-based but gt_* indices are 0-based
-            sample_info.append((int(row['sample_id']) - 1, str(row['name'])))
-        return sample_info
+        return [(int(row['sample_id']) - 1, str(row['name'])) for row in q.execute()]
 
     def _correct_genotype_filter(self, gt_filter=None):
         """
@@ -1019,8 +1026,11 @@ class GeminiQuery(object):
             # We must then split on whitespace and
             # correct the gt_* columns:
             # e.g., "gts.NA12878" or "and gt_types.M10500 == HET"
-            if (token.find("gt") >= 0 or token.find("GT") >= 0) \
-                and not '.(' in token and not ')self.' in token:
+            if (
+                ((token.find("gt") >= 0 or token.find("GT") >= 0))
+                and '.(' not in token
+                and ')self.' not in token
+            ):
                 tokens = re.split(r'[\s+]+', str(token))
                 for t in tokens:
                     if len(t) == 0:
@@ -1033,16 +1043,14 @@ class GeminiQuery(object):
                         if t.strip() in ("AND", "OR"):
                             t = t.lower()
                         corrected_gt_filter.append(t)
-            # IS a WILDCARD
-            # e.g., "gt_types.(affected==1).(==HET)"
             elif (token.find("gt") >= 0 or token.find("GT") >= 0) \
-                and '.(' in token and ').' in token:
+                    and '.(' in token and ').' in token:
                 # break the wildcard into its pieces. That is:
                 # (COLUMN).(WILDCARD).(WILDCARD_RULE).(WILDCARD_OP)
                 # e.g, (gts).(phenotype==2).(==HET).(any)
                 if token.count('.') != 3 or \
-                   token.count('(') != 4 or \
-                   token.count(')') != 4:
+                       token.count('(') != 4 or \
+                       token.count(')') != 4:
                     toks = token.split(".")
                     raise ValueError("Wildcard filter should consist of 4 elements. Exiting.")
                 (column, wildcard, wildcard_rule, wildcard_op) = token.split('.')
@@ -1051,7 +1059,7 @@ class GeminiQuery(object):
                 column = column.strip('(').strip(')').strip()
                 # allow commands like (gt_quals).(=HET).(>=20).(all)
                 wildcard = wildcard.strip('(').strip(')').strip()
-                is_gt_expression = "=HET" == wildcard or "=HOM_REF" == wildcard or "=HOM_ALT" == wildcard
+                is_gt_expression = wildcard in ["=HET", "=HOM_REF", "=HOM_ALT"]
 
                 wildcard_rule = wildcard_rule.strip('(').strip(')').strip()
                 wildcard_op = wildcard_op.strip('(').strip(')').strip()
@@ -1063,7 +1071,7 @@ class GeminiQuery(object):
                 # constructed below.
                 if is_gt_expression:
                     self.sample_info[token_idx] = self._get_matching_sample_ids("*")
-                    extra_filter = " if gt_types[sample[0]] == %s" % wildcard[1:]
+                    extra_filter = f" if gt_types[sample[0]] == {wildcard[1:]}"
                 else:
                     self.sample_info[token_idx] = self._get_matching_sample_ids(wildcard)
 
@@ -1076,30 +1084,41 @@ class GeminiQuery(object):
                         joiner = " and " if wildcard_op == "all" else " or "
                         rule = joiner.join("{column}[{sample}]{rule}".format(column=column, sample=s[0],
                                                                              rule=wildcard_rule) for s in self.sample_info[token_idx])
-                        rule = "(" + rule + ")"
+                        rule = f"({rule})"
                     else:
-                        rule = wildcard_op + "(" + column + '[sample[0]]' + wildcard_rule + " for sample in sample_info[" + str(token_idx) + "]%s)"
+                        rule = f"{wildcard_op}({column}[sample[0]]{wildcard_rule} for sample in sample_info[{str(token_idx)}]%s)"
+
                         rule %= (extra_filter or "")
                 elif wildcard_op == "none":
                     if self.variant_id_getter:
-                        rule = " or ".join("%s[%s]%s" % (column, s[0], wildcard_rule) for s in self.sample_info[token_idx])
-                        rule = "~ ((" + rule + "))"
+                        rule = " or ".join(
+                            f"{column}[{s[0]}]{wildcard_rule}"
+                            for s in self.sample_info[token_idx]
+                        )
+
+                        rule = f"~ (({rule}))"
                     else:
-                        rule = "not any(" + column + '[sample[0]]' + wildcard_rule + " for sample in sample_info[" + str(token_idx) + "]%s)"
+                        rule = f"not any({column}[sample[0]]{wildcard_rule} for sample in sample_info[{str(token_idx)}]%s)"
+
                         rule %= (extra_filter or "")
                 elif "count" in wildcard_op:
                     # break "count>=2" into ['', '>=2']
                     tokens = wildcard_op.split('count')
                     count_comp = tokens[len(tokens) - 1]
                     if self.variant_id_getter:
-                        rule = "|count|".join("((%s[%s]%s))" % (column, s[0], wildcard_rule) for s in self.sample_info[token_idx])
-                        rule = "%s|count|%s" % (rule, count_comp.strip())
+                        rule = "|count|".join(
+                            f"(({column}[{s[0]}]{wildcard_rule}))"
+                            for s in self.sample_info[token_idx]
+                        )
+
+                        rule = f"{rule}|count|{count_comp.strip()}"
                         seen_count = True
                     else:
-                        rule = "sum(" + column + '[sample[0]]' + wildcard_rule + " for sample in sample_info[" + str(token_idx) + "]%s)" + count_comp
+                        rule = f"sum({column}[sample[0]]{wildcard_rule} for sample in sample_info[{str(token_idx)}]%s){count_comp}"
+
                         rule %= (extra_filter or "")
                 else:
-                    raise ValueError("Unsupported wildcard operation: (%s). Exiting." % wildcard_op)
+                    raise ValueError(f"Unsupported wildcard operation: ({wildcard_op}). Exiting.")
 
                 corrected_gt_filter.append(rule)
             else:
@@ -1132,20 +1151,21 @@ class GeminiQuery(object):
         (select_tokens, rest_of_query) = get_select_cols_and_rest(self.query)
 
         # remove any GT columns
-        select_clause_list = []
-        for token in select_tokens:
-            if not token[:2] in ("GT", "gt") and \
-               not token[:3] in ("(gt", "(GT") and \
-               not ".gt" in token and \
-               not ".GT" in token:
-                select_clause_list.append(token)
+        select_clause_list = [
+            token
+            for token in select_tokens
+            if token[:2] not in ("GT", "gt")
+            and token[:3] not in ("(gt", "(GT")
+            and ".gt" not in token
+            and ".GT" not in token
+        ]
 
         # reconstruct the query with the GT* columns added
         select_clause = (", ".join(select_clause_list)).strip()
         if select_clause: select_clause += ","
         select_clause += ",".join(self.gt_cols)
 
-        self.query = "select %s %s" % (select_clause, rest_of_query)
+        self.query = f"select {select_clause} {rest_of_query}"
 
         # extract the original select columns
         return self.query
@@ -1160,12 +1180,12 @@ class GeminiQuery(object):
 
         (select_tokens, rest_of_query) = get_select_cols_and_rest(self.query)
 
-        if not any("gene" in s for s in select_tokens):
+        if all("gene" not in s for s in select_tokens):
 
             select_clause = ",".join(select_tokens) + \
-                        ", gene "
+                            ", gene "
 
-            self.query = "select " + select_clause + rest_of_query
+            self.query = f"select {select_clause}{rest_of_query}"
 
         return self.query
 
@@ -1181,14 +1201,26 @@ class GeminiQuery(object):
 
         (select_tokens, rest_of_query) = get_select_cols_and_rest(self.query)
 
-        cols_to_add = []
-        for col in ['chrom', 'start', 'vcf_id', 'ref', 'alt', 'qual', 'filter', 'info', \
-            'gts', 'gt_types', 'gt_phases']:
-            if not any(col in s for s in select_tokens):
-                cols_to_add.append(col)
+        cols_to_add = [
+            col
+            for col in [
+                'chrom',
+                'start',
+                'vcf_id',
+                'ref',
+                'alt',
+                'qual',
+                'filter',
+                'info',
+                'gts',
+                'gt_types',
+                'gt_phases',
+            ]
+            if all(col not in s for s in select_tokens)
+        ]
 
         select_clause = ",".join(select_tokens + cols_to_add)
-        self.query = "select %s %s" % (select_clause, rest_of_query)
+        self.query = f"select {select_clause} {rest_of_query}"
         return self.query
 
     def _split_select(self):

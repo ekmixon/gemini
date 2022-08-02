@@ -16,8 +16,8 @@ def get_select_cols_and_rest(query):
     """
     from_loc = query.lower().find("from")
 
-    raw_select_clause = query[0:from_loc].rstrip()
-    rest_of_query = query[from_loc:len(query)]
+    raw_select_clause = query[:from_loc].rstrip()
+    rest_of_query = query[from_loc:]
 
     # remove the SELECT keyword from the query
     select_pattern = re.compile("select", re.IGNORECASE)
@@ -36,7 +36,7 @@ def ensure_columns(query, cols):
     and return the new query string
     """
     sel_cols, rest = get_select_cols_and_rest(query)
-    sel_cols = [x for x in sel_cols]
+    sel_cols = list(sel_cols)
     if "*" in sel_cols:
         return query
     for c in cols:
